@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 
 import type { ClientTheme } from "../config/client";
 import type { ChatMessage } from "../hooks/useChat";
+import { SearchResultsCarousel } from "./SearchResultsCarousel";
 
 type ChatWindowProps = {
   messages: ChatMessage[];
@@ -38,6 +39,9 @@ export function ChatWindow({ messages, onSend, loading, error, theme }: ChatWind
             <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
               <span className="role">{message.role === "user" ? "You" : "Pixie"}</span>
               <p>{message.content}</p>
+              {message.rich?.type === "search-results" ? (
+                <SearchResultsCarousel results={message.rich.results} />
+              ) : null}
             </div>
           ))
         )}

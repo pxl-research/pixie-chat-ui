@@ -7,6 +7,7 @@ export type ChatRole = "user" | "assistant";
 export type ChatMessage = {
   role: ChatRole;
   content: string;
+  rich?: AssistantRichContent | null;
 };
 
 type PixieResponse = {
@@ -17,9 +18,35 @@ type PixieResponse = {
   conversationId?: string | null;
 };
 
+export type SearchResultAttribute = {
+  name: string;
+  label?: string;
+  value: unknown;
+};
+
+export type SearchResultItem = {
+  brand?: string;
+  price?: number;
+  availability?: boolean;
+  attributes?: SearchResultAttribute[];
+};
+
+export type SearchResultsResponse = {
+  total?: number;
+  count?: number;
+  items?: SearchResultItem[];
+  [key: string]: unknown;
+};
+
+export type AssistantRichContent =
+  | {
+      type: "search-results";
+      results: SearchResultsResponse;
+    };
+
 export function useChat(initialAssistantMessage?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>(
-    initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage }] : [],
+    initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage, rich: null }] : [],
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +56,7 @@ export function useChat(initialAssistantMessage?: string) {
     if (initialAssistantMessage === undefined) {
       return;
     }
-    setMessages(initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage }] : []);
+    setMessages(initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, [initialAssistantMessage]);
@@ -81,6 +108,7 @@ export function useChat(initialAssistantMessage?: string) {
         const nextConversationId = data?.conversationId ?? null;
 
         let assistantMessage: string | null = null;
+        let richContent: AssistantRichContent | null = null;
 
         switch (responseType) {
           case "ask_user":
@@ -90,7 +118,29 @@ export function useChat(initialAssistantMessage?: string) {
           case "answer":
           case "no_results":
           case "not_relevant":
-            assistantMessage = data?.text ?? "Geen antwoord beschikbaar.";
+            if (responseType === "answer" && typeof data?.text === "string") {
+              try {
+                const parsed = JSON.parse(data.text) as SearchResultsResponse | null;
+                if (parsed && typeof parsed === "object" && Array.isArray(parsed.items) && parsed.items.length > 0) {
+                  richContent = {
+                    type: "search-results",
+                    results: parsed,
+                  };
+                  const count = typeof parsed.count === "number" ? parsed.count : parsed.items.length;
+                  const total = typeof parsed.total === "number" ? parsed.total : undefined;
+                  assistantMessage =
+                    total !== undefined
+                      ? `Ik heb ${count} van de ${total} resultaten geselecteerd.`
+                      : `Ik heb ${count} resultaten gevonden.`;
+                } else {
+                  assistantMessage = data.text;
+                }
+              } catch {
+                assistantMessage = data.text ?? "Geen antwoord beschikbaar.";
+              }
+            } else {
+              assistantMessage = data?.text ?? "Geen antwoord beschikbaar.";
+            }
             setConversationId(null);
             break;
           case "error":
@@ -105,7 +155,7 @@ export function useChat(initialAssistantMessage?: string) {
         }
 
         if (assistantMessage) {
-          setMessages((prev) => [...prev, { role: "assistant", content: assistantMessage! }]);
+          setMessages((prev) => [...prev, { role: "assistant", content: assistantMessage!, rich: richContent }]);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
@@ -119,7 +169,7 @@ export function useChat(initialAssistantMessage?: string) {
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
-    setMessages(welcomeMessage ? [{ role: "assistant", content: welcomeMessage }] : []);
+    setMessages(welcomeMessage ? [{ role: "assistant", content: welcomeMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, []);
