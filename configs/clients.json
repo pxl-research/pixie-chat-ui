@@ -4,9 +4,11 @@
     "displayName": "AUVA",
     "collectionId": "collection-auva",
     "theme": {
-      "primaryColor": "#0055A4",
-      "logoUrl": "/branding/auva-logo.png"
-    }
+      "primaryColor": "#009fe4",
+      "logoUrl": "/branding/auva-logo.png",
+      "backgroundImageUrl": "/branding/auva-background.jpg"
+    },
+    "welcomeMessage": "Welkom bij AUVA! We helpen je graag verder met al je vragen over printers, laptops, smartphones en andere IT-benodigdheden. Waarnaar ben je vandaag op zoek?"
   },
   {
     "id": "wara",
@@ -14,7 +16,9 @@
     "collectionId": "collection-wara",
     "theme": {
       "primaryColor": "#C23C2A",
-      "logoUrl": "/branding/wara-logo.png"
-    }
+      "logoUrl": "/branding/wara-logo.png",
+      "backgroundImageUrl": "/branding/wara-background.png"
+    },
+    "welcomeMessage": "Welkom bij WARA! Hoe kunnen we je vandaag helpen?"
   }
 ]

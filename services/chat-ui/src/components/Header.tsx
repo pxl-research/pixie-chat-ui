@@ -3,9 +3,11 @@ import type { ClientTheme } from "../config/client";
 type HeaderProps = {
   displayName: string;
   theme: ClientTheme;
+  onNewConversation?: () => void;
+  disableActions?: boolean;
 };
 
-export function Header({ displayName, theme }: HeaderProps) {
+export function Header({ displayName, theme, onNewConversation, disableActions = false }: HeaderProps) {
   const background = theme.primaryColor || "#1f2937";
   const logoUrl = theme.logoUrl;
 
@@ -16,22 +18,44 @@ export function Header({ displayName, theme }: HeaderProps) {
         color: "#ffffff",
         display: "flex",
         alignItems: "center",
+        justifyContent: "space-between",
         padding: "0.75rem 1rem",
-        gap: "0.75rem",
       }}
     >
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={`${displayName} logo`}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={`${displayName} logo`}
+            style={{
+              width: "40px",
+              height: "40px",
+              objectFit: "contain",
+            }}
+          />
+        ) : null}
+        <span style={{ fontWeight: 600, fontSize: "1.125rem" }}>{displayName}</span>
+      </div>
+      {onNewConversation ? (
+        <button
+          type="button"
+          onClick={onNewConversation}
+          disabled={disableActions}
           style={{
-            width: "40px",
-            height: "40px",
-            objectFit: "contain",
+            backgroundColor: "#ffffff",
+            color: background,
+            border: "none",
+            borderRadius: "9999px",
+            padding: "0.5rem 1rem",
+            fontWeight: 600,
+            cursor: disableActions ? "not-allowed" : "pointer",
+            opacity: disableActions ? 0.7 : 1,
+            transition: "opacity 0.2s ease",
           }}
-        />
+        >
+          Nieuwe conversatie
+        </button>
       ) : null}
-      <span style={{ fontWeight: 600, fontSize: "1.125rem" }}>{displayName}</span>
     </header>
   );
 }

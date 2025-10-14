@@ -40,14 +40,34 @@ def load_client_config() -> Dict[str, Any]:
 CLIENT = load_client_config()
 
 
-@app.get("/client")
-async def client() -> Dict[str, Any]:
-    """Expose active client branding and identifiers to the UI."""
+def build_client_payload() -> Dict[str, Any]:
+    theme = dict(CLIENT.get("theme", {}))
+    override_primary = os.environ.get("ACTIVE_CLIENT_PRIMARY_COLOR")
+    if override_primary:
+        theme["primaryColor"] = override_primary
+
+    override_logo = os.environ.get("ACTIVE_CLIENT_LOGO_URL")
+    if override_logo:
+        theme["logoUrl"] = override_logo
+
+    override_background = os.environ.get("ACTIVE_CLIENT_BACKGROUND_IMAGE_URL")
+    if override_background:
+        theme["backgroundImageUrl"] = override_background
+
+    welcome_message = os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE") or CLIENT.get("welcomeMessage")
+
     return {
         "id": CLIENT["id"],
         "displayName": CLIENT["displayName"],
-        "theme": CLIENT.get("theme", {}),
+        "theme": theme,
+        "welcomeMessage": welcome_message,
     }
+
+
+@app.get("/client")
+async def client() -> Dict[str, Any]:
+    """Expose active client branding and identifiers to the UI."""
+    return build_client_payload()
 
 
 async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { API_BASE_URL } from "../config/client";
 
@@ -17,11 +17,22 @@ type PixieResponse = {
   conversationId?: string | null;
 };
 
-export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useChat(initialAssistantMessage?: string) {
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage }] : [],
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialAssistantMessage === undefined) {
+      return;
+    }
+    setMessages(initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage }] : []);
+    setError(null);
+    setConversationId(null);
+  }, [initialAssistantMessage]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -107,8 +118,8 @@ export function useChat() {
     [conversationId],
   );
 
-  const reset = useCallback(() => {
-    setMessages([]);
+  const reset = useCallback((welcomeMessage?: string) => {
+    setMessages(welcomeMessage ? [{ role: "assistant", content: welcomeMessage }] : []);
     setError(null);
     setConversationId(null);
   }, []);

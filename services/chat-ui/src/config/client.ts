@@ -1,12 +1,14 @@
 export type ClientTheme = {
   primaryColor?: string;
   logoUrl?: string;
+  backgroundImageUrl?: string;
 };
 
 export type ClientConfig = {
   id: string;
   displayName: string;
   theme: ClientTheme;
+  welcomeMessage?: string;
 };
 
 const DEFAULT_API_BASE_URL = "http://localhost:8010";

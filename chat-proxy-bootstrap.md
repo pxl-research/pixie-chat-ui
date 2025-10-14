@@ -45,8 +45,10 @@ Copy to `.env` for local runs.
     "collectionId": "collection-auva",
     "theme": {
       "primaryColor": "#0055A4",
-      "logoUrl": "/branding/auva-logo.png"
-    }
+      "logoUrl": "/branding/auva-logo.png",
+      "backgroundImageUrl": "/branding/auva-background.png"
+    },
+    "welcomeMessage": "Welkom bij AUVA! We helpen je graag verder met al je vragen over printers, laptops, smartphones en andere IT-benodigdheden. Waarnaar ben je vandaag op zoek?"
   },
   {
     "id": "wara",
@@ -54,8 +56,10 @@ Copy to `.env` for local runs.
     "collectionId": "collection-wara",
     "theme": {
       "primaryColor": "#C23C2A",
-      "logoUrl": "/branding/wara-logo.png"
-    }
+      "logoUrl": "/branding/wara-logo.png",
+      "backgroundImageUrl": "/branding/wara-background.png"
+    },
+    "welcomeMessage": "Welkom bij WARA! Hoe kunnen we je vandaag helpen?"
   }
 ]
 ```
@@ -67,6 +71,8 @@ Mount this file read-only into each container. Add a short `README` section abou
 - Set `ACTIVE_CLIENT_ID` in `.env` (or compose overrides) to point at the customer you want this deployment to use.
 - Both the UI and the proxy read `configs/clients.json`, pick the entry whose `id` matches `ACTIVE_CLIENT_ID`, and never expose runtime switching to end users.
 - Changing the customer means updating the env var and restarting the stack; document this explicitly.
+- Provide deployment-specific overrides via environment variables: `ACTIVE_CLIENT_WELCOME_MESSAGE`, `ACTIVE_CLIENT_PRIMARY_COLOR`, `ACTIVE_CLIENT_LOGO_URL`, and `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL`.
+- Provide deployment-time overrides for the active client's welcome message and branding by setting optional env vars: `ACTIVE_CLIENT_WELCOME_MESSAGE`, `ACTIVE_CLIENT_PRIMARY_COLOR`, and `ACTIVE_CLIENT_LOGO_URL`. The proxy merges these values over the JSON definition before serving the config to the UI.
 
 ---
 

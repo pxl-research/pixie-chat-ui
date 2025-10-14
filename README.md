@@ -33,7 +33,8 @@ Customer metadata lives in `configs/clients.json`. Each entry specifies:
 - `id`: unique identifier referenced by `ACTIVE_CLIENT_ID`
 - `displayName`: label displayed in the UI
 - `collectionId`: Pixie collection identifier (available to the proxy if you need to branch behaviour per client)
-- `theme`: optional styling hooks such as `primaryColor` and `logoUrl`
+- `theme`: optional styling hooks such as `primaryColor`, `logoUrl`, and `backgroundImageUrl`
+- `welcomeMessage`: opt-in greeting shown in the chat window before the user types
 
 To add a new customer:
 
@@ -45,6 +46,17 @@ To add a new customer:
 ## Active Client Resolution
 
 Both the UI and the proxy read `configs/clients.json` during startup, filter for the client whose `id` matches `ACTIVE_CLIENT_ID`, and expose that configuration at runtime. Switching customers is a deployment-time decision—update the environment variable and restart the containers to target a different client.
+
+## Per-deployment Branding Overrides
+
+When you only need to adjust the active client's branding for a specific deployment, set any of these optional values in `.env` instead of editing `configs/clients.json`:
+
+- `ACTIVE_CLIENT_WELCOME_MESSAGE`
+- `ACTIVE_CLIENT_PRIMARY_COLOR`
+- `ACTIVE_CLIENT_LOGO_URL`
+- `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL`
+
+The proxy merges these overrides into the client configuration it serves to the UI, so changes take effect after redeploying the stack.
 
 ## Pixie Core Connectivity
 
