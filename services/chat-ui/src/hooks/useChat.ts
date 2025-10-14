@@ -126,12 +126,7 @@ export function useChat(initialAssistantMessage?: string) {
                     type: "search-results",
                     results: parsed,
                   };
-                  const count = typeof parsed.count === "number" ? parsed.count : parsed.items.length;
-                  const total = typeof parsed.total === "number" ? parsed.total : undefined;
-                  assistantMessage =
-                    total !== undefined
-                      ? `Ik heb ${count} van de ${total} resultaten geselecteerd.`
-                      : `Ik heb ${count} resultaten gevonden.`;
+                  assistantMessage = null;
                 } else {
                   assistantMessage = data.text;
                 }
@@ -154,9 +149,10 @@ export function useChat(initialAssistantMessage?: string) {
             break;
         }
 
-        if (assistantMessage) {
-          setMessages((prev) => [...prev, { role: "assistant", content: assistantMessage!, rich: richContent }]);
-        }
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: assistantMessage ?? "", rich: richContent },
+        ]);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
         setError(message);

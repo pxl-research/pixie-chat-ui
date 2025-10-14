@@ -223,6 +223,11 @@ main {
   color: #111827;
 }
 
+.results-card dd.placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
 .results-carousel__controls {
   display: flex;
   align-items: center;
@@ -275,4 +280,8 @@ main {
     border-right: none;
     max-width: none;
   }
+}
+.results-carousel__topline {
+  font-weight: 600;
+  color: #111827;
 }
