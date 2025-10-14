@@ -1,4 +1,6 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+
+import type { FormEvent } from "react";
 
 import type { ClientTheme } from "../config/client";
 import type { ChatMessage } from "../hooks/useChat";

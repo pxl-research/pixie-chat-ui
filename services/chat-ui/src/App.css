@@ -60,6 +60,11 @@ main {
   max-width: 85%;
 }
 
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .message.user {
   align-self: flex-end;
   background-color: #dbeafe;

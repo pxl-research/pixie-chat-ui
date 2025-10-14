@@ -15,8 +15,8 @@ chat-proxy/
 ├── configs/
 ├── infra/
 ├── services/
-│   ├── api-proxy/
-│   └── ui/
+│   ├── chat-proxy/
+│   └── chat-ui/
 └── docker-compose.yml
 ```
 
@@ -70,7 +70,7 @@ Mount this file read-only into each container. Add a short `README` section abou
 
 ---
 
-## 3. API Proxy Service (`services/api-proxy`)
+## 3. API Proxy Service (`services/chat-proxy`)
 
 Target: Python 3.11 + FastAPI (minimal dependency surface, async support).
 
@@ -159,14 +159,14 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-## 4. UI Service (`services/ui`)
+## 4. UI Service (`services/chat-ui`)
 
 Target: Vite + React (fast cold-start, simple).
 
 ### 4.1 Bootstrap
 
-1. `npm create vite@latest ui -- --template react-ts`
-2. Move generated files into `services/ui`.
+1. `npm create vite@latest chat-ui -- --template react-ts`
+2. Move generated files into `services/chat-ui`.
 3. Install dependencies: `npm install`.
 
 ### 4.2 Key components
@@ -178,7 +178,7 @@ Target: Vite + React (fast cold-start, simple).
 
 ### 4.3 Proxy Settings
 
-Set `VITE_API_BASE_URL=http://api-proxy:8000` in `.env.development` (or inject via Docker). The UI loads the active client by calling the proxy's `/client` endpoint.
+Set `VITE_API_BASE_URL=http://localhost:8010` (or the host port you expose) in `.env.development`. The UI loads the active client by calling the proxy's `/client` endpoint from the browser.
 
 ### 4.4 `Dockerfile`
 
@@ -199,26 +199,26 @@ CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
 ```yaml
 version: "3.9"
 services:
-  api-proxy:
+  chat-proxy:
     build:
-      context: ./services/api-proxy
+      context: ./services/chat-proxy
     env_file: .env
     environment:
       CLIENT_CONFIG_PATH: /app/configs/clients.json
     volumes:
       - ./configs:/app/configs:ro
     ports:
-      - "8000:8000"
+      - "8010:8000"
 
-  ui:
+  chat-ui:
     build:
-      context: ./services/ui
+      context: ./services/chat-ui
     environment:
-      VITE_API_BASE_URL: http://api-proxy:8000
+      VITE_API_BASE_URL: http://localhost:8010
     volumes:
       - ./configs:/app/configs:ro
     depends_on:
-      - api-proxy
+      - chat-proxy
     ports:
       - "3000:3000"
 ```
@@ -229,7 +229,7 @@ Add a `make up` convenience target under `infra/Makefile` that runs `docker comp
 
 ## 6. Branding Assets
 
-- Store per-client assets in `services/ui/public/branding/`.
+- Store per-client assets in `services/chat-ui/public/branding/`.
 - Use the `logoUrl` values in UI components.
 - Explain in README how to add new assets and update `clients.json`.
 
@@ -241,7 +241,7 @@ Add a `make up` convenience target under `infra/Makefile` that runs `docker comp
 2. UI loads at `http://localhost:3000`.
 3. UI reflects the theme for the active client set via `ACTIVE_CLIENT_ID`.
 4. Sending a message calls `/chat` and proxies to Pixie (replace with mock when Pixie API unavailable).
-5. `curl -X POST http://localhost:8000/chat ...` works headlessly (document sample payload).
+5. `curl -X POST http://localhost:8010/chat ...` works headlessly (document sample payload).
 
 ---
 

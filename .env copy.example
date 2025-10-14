@@ -1,4 +1,2 @@
-PIXIE_API_BASE_URL=https://pixie-core.example/api
-PIXIE_API_KEY=replace-me
+PIXIE_CORE_API_BASE_URL=http://api:8000
 ACTIVE_CLIENT_ID=auva
-DEFAULT_CHAT_MODEL=gpt-4o-mini
