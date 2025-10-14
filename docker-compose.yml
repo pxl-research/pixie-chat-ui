@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  api-proxy:
+    build:
+      context: ./services/api-proxy
+    env_file: .env
+    environment:
+      CLIENT_CONFIG_PATH: /app/configs/clients.json
+    volumes:
+      - ./configs:/app/configs:ro
+    ports:
+      - "8000:8000"
+
+  ui:
+    build:
+      context: ./services/ui
+    environment:
+      VITE_API_BASE_URL: http://api-proxy:8000
+    volumes:
+      - ./configs:/app/configs:ro
+    depends_on:
+      - api-proxy
+    ports:
+      - "3000:3000"

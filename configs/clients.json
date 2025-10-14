@@ -1,0 +1,20 @@
+[
+  {
+    "id": "auva",
+    "displayName": "AUVA",
+    "collectionId": "collection-auva",
+    "theme": {
+      "primaryColor": "#0055A4",
+      "logoUrl": "/branding/auva-logo.png"
+    }
+  },
+  {
+    "id": "wara",
+    "displayName": "WARA",
+    "collectionId": "collection-wara",
+    "theme": {
+      "primaryColor": "#C23C2A",
+      "logoUrl": "/branding/wara-logo.png"
+    }
+  }
+]
