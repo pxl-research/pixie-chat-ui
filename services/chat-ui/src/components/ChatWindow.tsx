@@ -35,15 +35,27 @@ export function ChatWindow({ messages, onSend, loading, error, theme }: ChatWind
         {messages.length === 0 ? (
           <div className="empty-state">Start the conversation by saying hello.</div>
         ) : (
-          messages.map((message, index) => (
-            <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-              <span className="role">{message.role === "user" ? "You" : "Pixie"}</span>
-              <p>{message.content}</p>
-              {message.rich?.type === "search-results" ? (
-                <SearchResultsCarousel results={message.rich.results} />
-              ) : null}
-            </div>
-          ))
+          <>
+            {messages.map((message, index) => (
+              <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
+                <span className="role">{message.role === "user" ? "You" : "Pixie"}</span>
+                {message.content ? <p>{message.content}</p> : null}
+                {message.rich?.type === "search-results" ? (
+                  <SearchResultsCarousel results={message.rich.results} />
+                ) : null}
+              </div>
+            ))}
+            {loading ? (
+              <div className="message assistant typing">
+                <span className="role">Pixie</span>
+                <div className="typing-indicator" aria-label="Pixie is typing" role="status">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 
