@@ -28,7 +28,7 @@ docker-compose.yml     # Service orchestration
 
 ## Customer Configuration
 
-The proxy now derives the active client's configuration from environment variables on startup. Set the following values in `.env` (or your deployment secrets):
+The proxy derives the active client's configuration entirely from environment variables. Set the following values in `.env` (or your deployment secrets):
 
 - `ACTIVE_CLIENT_ID` (required) – unique identifier for the deployment.
 - `ACTIVE_CLIENT_DISPLAY_NAME` (optional) – label shown in the UI, defaults to the client ID.
@@ -36,13 +36,11 @@ The proxy now derives the active client's configuration from environment variabl
 - `ACTIVE_CLIENT_WELCOME_MESSAGE` (optional) – greeting rendered in the chat window.
 - `ACTIVE_CLIENT_PRIMARY_COLOR`, `ACTIVE_CLIENT_LOGO_URL`, `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL` (optional) – branding hooks exposed to the UI.
 
-During boot the proxy materialises `/app/configs/clients.json` with a minimal entry generated from these values and starts Uvicorn. The UI fetches that config from `/client`, so both services remain in sync without shipping a committed JSON file.
-
-Prefer to manage a richer JSON definition? Drop the file in the container (or mount it) and point `CLIENT_CONFIG_PATH` at its location. When the file exists, the proxy honours it while still allowing the environment overrides above.
+The UI fetches the configuration from the `/client` endpoint, which builds the response directly from these environment variables.
 
 ## Per-deployment Branding Overrides
 
-All overrides are environment-driven. Update the optional variables listed above and redeploy; the proxy regenerates the client configuration on the next start and the UI reflects the new branding after a refresh.
+All overrides are environment-driven. Update the optional variables listed above and redeploy; the proxy reads the environment variables on startup and the UI reflects the new branding after a refresh.
 
 ## UI Connectivity
 

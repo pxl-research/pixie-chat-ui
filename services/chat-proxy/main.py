@@ -1,15 +1,11 @@
 from typing import Any, Dict
 
-import json
 import os
-from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
-
-from bootstrap import collect_theme_overrides, build_client_definition, ensure_client_config_file
 
 app = FastAPI()
 
@@ -20,51 +16,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PIXIE_CORE_API_BASE_URL = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get("PIXIE_API_BASE_URL")
-if not PIXIE_CORE_API_BASE_URL:
+# Validate required environment variables
+_pixie_url = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get(
+    "PIXIE_API_BASE_URL"
+)
+if not _pixie_url:
     raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
+PIXIE_CORE_API_BASE_URL: str = _pixie_url.rstrip("/")
 
-CLIENT_CONFIG_PATH = str(ensure_client_config_file())
-ACTIVE_CLIENT_ID = os.environ["ACTIVE_CLIENT_ID"]
+_client_id = os.environ.get("ACTIVE_CLIENT_ID")
+if not _client_id:
+    raise RuntimeError("ACTIVE_CLIENT_ID environment variable is required")
+ACTIVE_CLIENT_ID: str = _client_id
+
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
-
-PIXIE_CORE_API_BASE_URL = PIXIE_CORE_API_BASE_URL.rstrip("/")
-
-
-def load_client_config() -> Dict[str, Any]:
-    path = Path(CLIENT_CONFIG_PATH)
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            clients = json.load(handle)
-    except FileNotFoundError:
-        return build_client_definition()
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON in {path}: {exc}") from exc
-
-    if not isinstance(clients, list):
-        raise RuntimeError(f"Client config at {path} must be a list of clients")
-
-    matched = next((c for c in clients if c["id"] == ACTIVE_CLIENT_ID), None)
-    if matched is None:
-        return build_client_definition()
-    return matched
-
-
-CLIENT = load_client_config()
 
 
 def build_client_payload() -> Dict[str, Any]:
-    theme = dict(CLIENT.get("theme", {}))
-    theme.update(collect_theme_overrides())
+    """Build client configuration from environment variables."""
+    theme: Dict[str, str] = {}
 
-    welcome_message = os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE") or CLIENT.get("welcomeMessage")
-    display_name = os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME") or CLIENT.get("displayName") or CLIENT["id"]
+    # Add theme properties if defined
+    if primary_color := os.environ.get("ACTIVE_CLIENT_PRIMARY_COLOR"):
+        theme["primaryColor"] = primary_color
+    if logo_url := os.environ.get("ACTIVE_CLIENT_LOGO_URL"):
+        theme["logoUrl"] = logo_url
+    if bg_image := os.environ.get("ACTIVE_CLIENT_BACKGROUND_IMAGE_URL"):
+        theme["backgroundImageUrl"] = bg_image
 
     return {
-        "id": CLIENT["id"],
-        "displayName": display_name,
+        "id": ACTIVE_CLIENT_ID,
+        "displayName": os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", ACTIVE_CLIENT_ID),
         "theme": theme,
-        "welcomeMessage": welcome_message,
+        "welcomeMessage": os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE"),
     }
 
 
@@ -79,7 +63,9 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
     if PIXIE_API_KEY:
         headers["Authorization"] = f"Bearer {PIXIE_API_KEY}"
 
-    async with httpx.AsyncClient(base_url=PIXIE_CORE_API_BASE_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        base_url=PIXIE_CORE_API_BASE_URL, timeout=30.0
+    ) as client:
         try:
             response = await client.post("/ask", json=payload, headers=headers)
             response.raise_for_status()
@@ -88,17 +74,25 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
                 detail = exc.response.json()
             except ValueError:
                 detail = exc.response.text
-            raise HTTPException(status_code=exc.response.status_code, detail=detail) from exc
+            raise HTTPException(
+                status_code=exc.response.status_code, detail=detail
+            ) from exc
         except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Error reaching Pixie Core: {exc}") from exc
+            raise HTTPException(
+                status_code=502, detail=f"Error reaching Pixie Core: {exc}"
+            ) from exc
 
     try:
         data = response.json()
     except ValueError as exc:
-        raise HTTPException(status_code=502, detail="Invalid JSON received from Pixie Core") from exc
+        raise HTTPException(
+            status_code=502, detail="Invalid JSON received from Pixie Core"
+        ) from exc
 
     if not isinstance(data, dict):
-        raise HTTPException(status_code=502, detail="Unexpected response format from Pixie Core")
+        raise HTTPException(
+            status_code=502, detail="Unexpected response format from Pixie Core"
+        )
 
     return data
 

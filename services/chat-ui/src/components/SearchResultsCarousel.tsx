@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import type { SearchResultAttribute, SearchResultItem, SearchResultsResponse } from "../hooks/useChat";
+import type { SearchResultItem, SearchResultsResponse } from "../hooks/useChat";
 
 type SearchResultsCarouselProps = {
   results: SearchResultsResponse;
@@ -12,10 +12,9 @@ const currencyFormatter = new Intl.NumberFormat("nl-BE", {
   minimumFractionDigits: 2,
 });
 
-function cleanString(value?: string | null): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
+/**
+ * Format an attribute value for display.
+ */
 function formatValue(value: unknown): string {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value.toString() : "";
@@ -29,59 +28,10 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-type AttributeSchemaEntry = {
-  key: string;
-  label: string;
-};
-
-function resolveAttributeKey(attribute: SearchResultAttribute, fallbackIndex: number): string {
-  return cleanString(attribute.name) || cleanString(attribute.label) || `attribute-${fallbackIndex}`;
-}
-
-function resolveAttributeLabel(attribute: SearchResultAttribute, fallbackIndex: number): string {
-  return cleanString(attribute.label) || cleanString(attribute.name) || `attribute-${fallbackIndex}`;
-}
-
-function buildAttributeSchema(items: SearchResultItem[]): AttributeSchemaEntry[] {
-  const schema = new Map<string, { key: string; label: string; count: number }>();
-
-  items.forEach((item) => {
-    (item.attributes ?? []).forEach((attribute, index) => {
-      const key = resolveAttributeKey(attribute, index);
-      const label = resolveAttributeLabel(attribute, index);
-      const existing = schema.get(key);
-
-      if (existing) {
-        existing.count += 1;
-        if (label.length > existing.label.length) {
-          existing.label = label;
-        }
-      } else {
-        schema.set(key, { key, label, count: 1 });
-      }
-    });
-  });
-
-  return Array.from(schema.values())
-    .sort((a, b) => {
-      if (b.count !== a.count) {
-        return b.count - a.count;
-      }
-      return a.label.localeCompare(b.label);
-    })
-    .map(({ key, label }) => ({ key, label }));
-}
-
-function ResultCard({ item, schema }: { item: SearchResultItem; schema: AttributeSchemaEntry[] }) {
-  const attributeMap: Record<string, SearchResultAttribute> = {};
-
-  (item.attributes ?? []).forEach((attribute, index) => {
-    const key = resolveAttributeKey(attribute, index);
-    if (!(key in attributeMap)) {
-      attributeMap[key] = attribute;
-    }
-  });
-
+/**
+ * Display a single search result item.
+ */
+function ResultCard({ item }: { item: SearchResultItem }) {
   return (
     <article className="results-card">
       <header>
@@ -96,13 +46,14 @@ function ResultCard({ item, schema }: { item: SearchResultItem; schema: Attribut
         ) : null}
       </header>
       <dl>
-        {schema.map((schemaEntry, index) => {
-          const attribute = attributeMap[schemaEntry.key];
-          const value = attribute ? formatValue(attribute.value) : "";
+        {(item.attributes ?? []).map((attribute, index) => {
+          const label = attribute.label || attribute.name || `Attribuut ${index + 1}`;
+          const value = formatValue(attribute.value);
           const content = value || "—";
+          
           return (
-            <div key={`${schemaEntry.key}-${index}`} className="attribute-row">
-              <dt>{schemaEntry.label}</dt>
+            <div key={`${attribute.name}-${index}`} className="attribute-row">
+              <dt>{label}</dt>
               <dd className={value ? undefined : "placeholder"}>{content}</dd>
             </div>
           );
@@ -112,9 +63,11 @@ function ResultCard({ item, schema }: { item: SearchResultItem; schema: Attribut
   );
 }
 
+/**
+ * Display a carousel of search results with navigation controls.
+ */
 export function SearchResultsCarousel({ results }: SearchResultsCarouselProps) {
   const items = useMemo(() => results.items?.filter(Boolean) ?? [], [results.items]);
-  const attributeSchema = useMemo(() => buildAttributeSchema(items), [items]);
   const [index, setIndex] = useState(0);
 
   if (items.length === 0) {
@@ -165,7 +118,7 @@ export function SearchResultsCarousel({ results }: SearchResultsCarouselProps) {
       </div>
 
       <div className="results-carousel__viewport">
-        <ResultCard item={items[index]} schema={attributeSchema} />
+        <ResultCard item={items[index]} />
       </div>
 
       {items.length > 1 ? (

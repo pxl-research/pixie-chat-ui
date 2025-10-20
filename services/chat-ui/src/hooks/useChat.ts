@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { API_BASE_URL } from "../config/client";
+import { sendChatMessage } from "../api/chat";
+import { parseApiResponse } from "../utils/responseParser";
+import type { AssistantRichContent } from "../utils/responseParser";
 
 export type ChatRole = "user" | "assistant";
 
@@ -10,40 +12,17 @@ export type ChatMessage = {
   rich?: AssistantRichContent | null;
 };
 
-type PixieResponse = {
-  type?: string;
-  text?: string | null;
-  prompt?: string | null;
-  reason?: string | null;
-  conversationId?: string | null;
-};
+// Re-export types for backward compatibility
+export type {
+  SearchResultAttribute,
+  SearchResultItem,
+  SearchResultsResponse,
+  AssistantRichContent,
+} from "../utils/responseParser";
 
-export type SearchResultAttribute = {
-  name: string;
-  label?: string;
-  value: unknown;
-};
-
-export type SearchResultItem = {
-  brand?: string;
-  price?: number;
-  availability?: boolean;
-  attributes?: SearchResultAttribute[];
-};
-
-export type SearchResultsResponse = {
-  total?: number;
-  count?: number;
-  items?: SearchResultItem[];
-  [key: string]: unknown;
-};
-
-export type AssistantRichContent =
-  | {
-      type: "search-results";
-      results: SearchResultsResponse;
-    };
-
+/**
+ * Hook for managing chat state and interactions.
+ */
 export function useChat(initialAssistantMessage?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>(
     initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage, rich: null }] : [],
@@ -52,6 +31,7 @@ export function useChat(initialAssistantMessage?: string) {
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
+  // Reset when initial message changes
   useEffect(() => {
     if (initialAssistantMessage === undefined) {
       return;
@@ -68,90 +48,33 @@ export function useChat(initialAssistantMessage?: string) {
         return;
       }
 
+      // Add user message to chat
       setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
       setLoading(true);
       setError(null);
 
       try {
-        const payload: Record<string, unknown> = { input: trimmed };
-        if (conversationId) {
-          payload.conversationId = conversationId;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+        // Call API
+        const apiResponse = await sendChatMessage({
+          input: trimmed,
+          conversationId,
         });
 
-        if (!response.ok) {
-          const detailText = await response.text();
-          let detailMessage = detailText;
-          try {
-            const parsed = JSON.parse(detailText);
-            if (typeof parsed === "string") {
-              detailMessage = parsed;
-            } else if (parsed?.detail) {
-              detailMessage = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
-            }
-          } catch {
-            // Leave detailMessage as-is when JSON parsing fails.
-          }
-          throw new Error(detailMessage || `Request failed with status ${response.status}`);
+        // Parse response
+        const parsed = parseApiResponse(apiResponse);
+
+        // Update conversation state
+        setConversationId(parsed.conversationId);
+
+        // Update error state if needed
+        if (parsed.error) {
+          setError(parsed.error);
         }
 
-        const data: PixieResponse = await response.json();
-
-        const responseType = data?.type ?? "answer";
-        const nextConversationId = data?.conversationId ?? null;
-
-        let assistantMessage: string | null = null;
-        let richContent: AssistantRichContent | null = null;
-
-        switch (responseType) {
-          case "ask_user":
-            assistantMessage = data?.prompt ?? "Kun je wat meer details delen?";
-            setConversationId(nextConversationId);
-            break;
-          case "answer":
-          case "no_results":
-          case "not_relevant":
-            if (responseType === "answer" && typeof data?.text === "string") {
-              try {
-                const parsed = JSON.parse(data.text) as SearchResultsResponse | null;
-                if (parsed && typeof parsed === "object" && Array.isArray(parsed.items) && parsed.items.length > 0) {
-                  richContent = {
-                    type: "search-results",
-                    results: parsed,
-                  };
-                  assistantMessage = null;
-                } else {
-                  assistantMessage = data.text;
-                }
-              } catch {
-                assistantMessage = data.text ?? "Geen antwoord beschikbaar.";
-              }
-            } else {
-              assistantMessage = data?.text ?? "Geen antwoord beschikbaar.";
-            }
-            setConversationId(null);
-            break;
-          case "error":
-            assistantMessage = data?.reason ?? "Pixie Core gaf een foutmelding.";
-            setConversationId(null);
-            setError(data?.reason ?? "Pixie Core gaf een foutmelding.");
-            break;
-          default:
-            assistantMessage = data?.text ?? data?.prompt ?? data?.reason ?? null;
-            setConversationId(nextConversationId);
-            break;
-        }
-
+        // Add assistant message to chat
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: assistantMessage ?? "", rich: richContent },
+          { role: "assistant", content: parsed.content ?? "", rich: parsed.richContent },
         ]);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
