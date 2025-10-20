@@ -27,52 +27,33 @@ chat-proxy/
 ### 2.1 `.env.example`
 
 ```
-PIXIE_API_BASE_URL=https://pixie-core.example/api
-PIXIE_API_KEY=replace-me
+PIXIE_CORE_API_BASE_URL=https://pixie-core.example/api
+# PIXIE_API_KEY=replace-me
 ACTIVE_CLIENT_ID=auva
-DEFAULT_CHAT_MODEL=gpt-4o-mini
+ACTIVE_CLIENT_DISPLAY_NAME=AUVA
+# ACTIVE_CLIENT_WELCOME_MESSAGE=
+# ACTIVE_CLIENT_PRIMARY_COLOR=
+# ACTIVE_CLIENT_LOGO_URL=
+# ACTIVE_CLIENT_BACKGROUND_IMAGE_URL=
+# ACTIVE_CLIENT_COLLECTION_ID=
+VITE_API_BASE_URL=http://localhost:8010
 ```
 
 Copy to `.env` for local runs.
 
-### 2.2 `configs/clients.json`
+### 2.2 Client config bootstrap
 
-```json
-[
-  {
-    "id": "auva",
-    "displayName": "AUVA",
-    "collectionId": "collection-auva",
-    "theme": {
-      "primaryColor": "#0055A4",
-      "logoUrl": "/branding/auva-logo.png",
-      "backgroundImageUrl": "/branding/auva-background.png"
-    },
-    "welcomeMessage": "Welkom bij AUVA! We helpen je graag verder met al je vragen over printers, laptops, smartphones en andere IT-benodigdheden. Waarnaar ben je vandaag op zoek?"
-  },
-  {
-    "id": "wara",
-    "displayName": "WARA",
-    "collectionId": "collection-wara",
-    "theme": {
-      "primaryColor": "#C23C2A",
-      "logoUrl": "/branding/wara-logo.png",
-      "backgroundImageUrl": "/branding/wara-background.png"
-    },
-    "welcomeMessage": "Welkom bij WARA! Hoe kunnen we je vandaag helpen?"
-  }
-]
-```
-
-Mount this file read-only into each container. Add a short `README` section about extending this list.
+- Default the proxy to write `/app/configs/clients.json` on startup by deriving the active client's definition from the environment variables above.
+- The generated file only needs to contain the active client. Keep the structure compatible with future expansions (`id`, `displayName`, optional `collectionId`, `theme`, `welcomeMessage`) so that downstream services can still consume it.
+- Allow deployments to provide their own JSON file by supplying `CLIENT_CONFIG_PATH` (the bootstrapper should skip regeneration when the file already exists).
+- Document in the `README` that the JSON file is optional—only required when you want to ship multiple client definitions or maintain them outside of environment variables.
 
 ### 2.3 Active client resolution
 
-- Set `ACTIVE_CLIENT_ID` in `.env` (or compose overrides) to point at the customer you want this deployment to use.
-- Both the UI and the proxy read `configs/clients.json`, pick the entry whose `id` matches `ACTIVE_CLIENT_ID`, and never expose runtime switching to end users.
-- Changing the customer means updating the env var and restarting the stack; document this explicitly.
-- Provide deployment-specific overrides via environment variables: `ACTIVE_CLIENT_WELCOME_MESSAGE`, `ACTIVE_CLIENT_PRIMARY_COLOR`, `ACTIVE_CLIENT_LOGO_URL`, and `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL`.
-- Provide deployment-time overrides for the active client's welcome message and branding by setting optional env vars: `ACTIVE_CLIENT_WELCOME_MESSAGE`, `ACTIVE_CLIENT_PRIMARY_COLOR`, and `ACTIVE_CLIENT_LOGO_URL`. The proxy merges these values over the JSON definition before serving the config to the UI.
+- Set `ACTIVE_CLIENT_ID` (and optional display/branding env vars) in `.env` or Compose overrides.
+- On container startup the bootstrapper ensures the client config file exists, generating one from the environment when absent.
+- The proxy loads the active client data once and merges the runtime overrides on every `/client` request.
+- Switching to a different client is still a deployment-time decision: update the env vars and restart the stack.
 
 ---
 
@@ -96,60 +77,94 @@ build-backend = "setuptools.build_meta"
 ### 3.2 `main.py`
 
 ```python
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import json
 import os
+from pathlib import Path
+
 import httpx
 from fastapi import FastAPI, HTTPException
 
+from bootstrap import build_client_definition, ensure_client_config_file
+
 app = FastAPI()
 
-PIXIE_API_BASE_URL = os.environ["PIXIE_API_BASE_URL"]
-PIXIE_API_KEY = os.environ["PIXIE_API_KEY"]
-CLIENT_CONFIG_PATH = os.environ.get("CLIENT_CONFIG_PATH", "/app/configs/clients.json")
+PIXIE_CORE_API_BASE_URL = (os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get("PIXIE_API_BASE_URL", "")).rstrip("/")
+if not PIXIE_CORE_API_BASE_URL:
+    raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
+
+CLIENT_CONFIG_PATH = str(ensure_client_config_file())
 ACTIVE_CLIENT_ID = os.environ["ACTIVE_CLIENT_ID"]
+PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
+
 
 def load_client_config() -> Dict[str, Any]:
-    with open(CLIENT_CONFIG_PATH, "r", encoding="utf-8") as handle:
-        clients = json.load(handle)
-    matched = next((c for c in clients if c["id"] == ACTIVE_CLIENT_ID), None)
-    if not matched:
-        raise RuntimeError(f"Client '{ACTIVE_CLIENT_ID}' not found in {CLIENT_CONFIG_PATH}")
-    return matched
+    path = Path(CLIENT_CONFIG_PATH)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            clients = json.load(handle)
+    except FileNotFoundError:
+        return build_client_definition()
+
+    matched = next((c for c in clients if c.get("id") == ACTIVE_CLIENT_ID), None)
+    return matched or build_client_definition()
+
 
 CLIENT = load_client_config()
 
+
 @app.get("/client")
 async def client() -> Dict[str, Any]:
-    """Expose active client branding and identifiers to the UI."""
+    theme = dict(CLIENT.get("theme", {}))
+    if os.environ.get("ACTIVE_CLIENT_PRIMARY_COLOR"):
+        theme["primaryColor"] = os.environ["ACTIVE_CLIENT_PRIMARY_COLOR"]
+    if os.environ.get("ACTIVE_CLIENT_LOGO_URL"):
+        theme["logoUrl"] = os.environ["ACTIVE_CLIENT_LOGO_URL"]
+    if os.environ.get("ACTIVE_CLIENT_BACKGROUND_IMAGE_URL"):
+        theme["backgroundImageUrl"] = os.environ["ACTIVE_CLIENT_BACKGROUND_IMAGE_URL"]
+
     return {
         "id": CLIENT["id"],
-        "displayName": CLIENT["displayName"],
-        "theme": CLIENT.get("theme", {}),
+        "displayName": os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", CLIENT.get("displayName", CLIENT["id"])),
+        "theme": theme,
+        "welcomeMessage": os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE") or CLIENT.get("welcomeMessage"),
     }
 
+
 async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
-    headers = {
-        "Authorization": f"Bearer {PIXIE_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(f"{PIXIE_API_BASE_URL}/chat", json=payload, headers=headers)
-        if response.status_code >= 400:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+    headers = {"Content-Type": "application/json"}
+    if PIXIE_API_KEY:
+        headers["Authorization"] = f"Bearer {PIXIE_API_KEY}"
+
+    async with httpx.AsyncClient(base_url=PIXIE_CORE_API_BASE_URL, timeout=30.0) as client:
+        response = await client.post("/ask", json=payload, headers=headers)
+        response.raise_for_status()
         return response.json()
+
 
 @app.post("/chat")
 async def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Forward chat request to Pixie Core for the active client."""
-    messages: List[Dict[str, Any]] = payload.get("messages", [])
-    pixie_payload = {
-        "collectionId": CLIENT["collectionId"],
-        "model": payload.get("model", os.environ.get("DEFAULT_CHAT_MODEL")),
-        "messages": messages,
+    message = payload.get("input", "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Input may not be empty.")
+
+    pixie_payload = {"question": message}
+    if payload.get("conversationId"):
+        pixie_payload = {
+            "conversation_id": payload["conversationId"],
+            "message": message,
+        }
+
+    data = await call_pixie(pixie_payload)
+    return {
+        "type": data.get("type"),
+        "text": data.get("text"),
+        "prompt": data.get("prompt"),
+        "reason": data.get("reason"),
+        "conversationId": data.get("conversation_id"),
     }
-    return await call_pixie(pixie_payload)
 ```
 
 ### 3.3 `Dockerfile`
@@ -160,7 +175,7 @@ WORKDIR /app
 COPY pyproject.toml /app/
 RUN pip install --no-cache-dir fastapi uvicorn[standard] httpx
 COPY . /app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "bootstrap.py"]
 ```
 
 ---
@@ -184,7 +199,7 @@ Target: Vite + React (fast cold-start, simple).
 
 ### 4.3 Proxy Settings
 
-Set `VITE_API_BASE_URL=http://localhost:8010` (or the host port you expose) in `.env.development`. The UI loads the active client by calling the proxy's `/client` endpoint from the browser.
+Expose `VITE_API_BASE_URL` in the UI environment so the bundle knows how to reach the proxy. During local development it typically points to `http://localhost:8010`; in production match the externally reachable proxy URL. When left undefined the UI falls back to `window.location.origin`, which keeps things working when the proxy and UI share a host.
 
 ### 4.4 `Dockerfile`
 
@@ -209,20 +224,13 @@ services:
     build:
       context: ./services/chat-proxy
     env_file: .env
-    environment:
-      CLIENT_CONFIG_PATH: /app/configs/clients.json
-    volumes:
-      - ./configs:/app/configs:ro
     ports:
       - "8010:8000"
 
   chat-ui:
     build:
       context: ./services/chat-ui
-    environment:
-      VITE_API_BASE_URL: http://localhost:8010
-    volumes:
-      - ./configs:/app/configs:ro
+    env_file: .env
     depends_on:
       - chat-proxy
     ports:
@@ -237,7 +245,7 @@ Add a `make up` convenience target under `infra/Makefile` that runs `docker comp
 
 - Store per-client assets in `services/chat-ui/public/branding/`.
 - Use the `logoUrl` values in UI components.
-- Explain in README how to add new assets and update `clients.json`.
+- Explain in README how to add new assets and which environment variables (or optional JSON overrides) need to change.
 
 ---
 
@@ -255,7 +263,7 @@ Add a `make up` convenience target under `infra/Makefile` that runs `docker comp
 
 - Repository with skeleton structure, Docker setup, minimal FastAPI proxy, Vite-based chat UI.
 - `README.md` covering prerequisites, configuration, run instructions, customer onboarding.
-- `.env.example` and `configs/clients.json` to copy/fill.
+- `.env.example` (plus optional sample `configs/clients.json` if you want to illustrate multi-client setups).
 - Instructions for swapping in different frontends or avatars later.
 
 This is intentionally lean—focus on reliable local container orchestration and a simple, verifiable chat loop.

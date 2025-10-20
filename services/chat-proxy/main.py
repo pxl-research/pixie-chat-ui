@@ -2,11 +2,14 @@ from typing import Any, Dict
 
 import json
 import os
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
+
+from bootstrap import build_client_definition, ensure_client_config_file
 
 app = FastAPI()
 
@@ -21,7 +24,7 @@ PIXIE_CORE_API_BASE_URL = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.enviro
 if not PIXIE_CORE_API_BASE_URL:
     raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
 
-CLIENT_CONFIG_PATH = os.environ.get("CLIENT_CONFIG_PATH", "/app/configs/clients.json")
+CLIENT_CONFIG_PATH = str(ensure_client_config_file())
 ACTIVE_CLIENT_ID = os.environ["ACTIVE_CLIENT_ID"]
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
 
@@ -29,11 +32,21 @@ PIXIE_CORE_API_BASE_URL = PIXIE_CORE_API_BASE_URL.rstrip("/")
 
 
 def load_client_config() -> Dict[str, Any]:
-    with open(CLIENT_CONFIG_PATH, "r", encoding="utf-8") as handle:
-        clients = json.load(handle)
+    path = Path(CLIENT_CONFIG_PATH)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            clients = json.load(handle)
+    except FileNotFoundError:
+        return build_client_definition()
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid JSON in {path}: {exc}") from exc
+
+    if not isinstance(clients, list):
+        raise RuntimeError(f"Client config at {path} must be a list of clients")
+
     matched = next((c for c in clients if c["id"] == ACTIVE_CLIENT_ID), None)
-    if not matched:
-        raise RuntimeError(f"Client '{ACTIVE_CLIENT_ID}' not found in {CLIENT_CONFIG_PATH}")
+    if matched is None:
+        return build_client_definition()
     return matched
 
 
@@ -55,10 +68,11 @@ def build_client_payload() -> Dict[str, Any]:
         theme["backgroundImageUrl"] = override_background
 
     welcome_message = os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE") or CLIENT.get("welcomeMessage")
+    display_name = os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME") or CLIENT.get("displayName") or CLIENT["id"]
 
     return {
         "id": CLIENT["id"],
-        "displayName": CLIENT["displayName"],
+        "displayName": display_name,
         "theme": theme,
         "welcomeMessage": welcome_message,
     }

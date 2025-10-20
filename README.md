@@ -19,7 +19,7 @@ Minimal containerized chat experience that forwards requests through a Pixie Cor
 ## Repository Structure
 
 ```
-configs/               # Shared client definitions mounted into each service
+configs/               # (Optional) curated client definitions to seed deployments
 infra/                 # Infrastructure helpers (e.g., Makefile)
 services/chat-proxy/   # FastAPI proxy service that talks to Pixie Core
 services/chat-ui/      # React chat UI served via Vite
@@ -28,35 +28,25 @@ docker-compose.yml     # Service orchestration
 
 ## Customer Configuration
 
-Customer metadata lives in `configs/clients.json`. Each entry specifies:
+The proxy now derives the active client's configuration from environment variables on startup. Set the following values in `.env` (or your deployment secrets):
 
-- `id`: unique identifier referenced by `ACTIVE_CLIENT_ID`
-- `displayName`: label displayed in the UI
-- `collectionId`: Pixie collection identifier (available to the proxy if you need to branch behaviour per client)
-- `theme`: optional styling hooks such as `primaryColor`, `logoUrl`, and `backgroundImageUrl`
-- `welcomeMessage`: opt-in greeting shown in the chat window before the user types
+- `ACTIVE_CLIENT_ID` (required) – unique identifier for the deployment.
+- `ACTIVE_CLIENT_DISPLAY_NAME` (optional) – label shown in the UI, defaults to the client ID.
+- `ACTIVE_CLIENT_COLLECTION_ID` (optional) – available if downstream services need to branch on collection.
+- `ACTIVE_CLIENT_WELCOME_MESSAGE` (optional) – greeting rendered in the chat window.
+- `ACTIVE_CLIENT_PRIMARY_COLOR`, `ACTIVE_CLIENT_LOGO_URL`, `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL` (optional) – branding hooks exposed to the UI.
 
-To add a new customer:
+During boot the proxy materialises `/app/configs/clients.json` with a minimal entry generated from these values and starts Uvicorn. The UI fetches that config from `/client`, so both services remain in sync without shipping a committed JSON file.
 
-1. Append a new JSON object to `configs/clients.json`.
-2. Drop any branding assets under `services/chat-ui/public/branding/`.
-3. Update your `.env` (or Compose overrides) with the new `ACTIVE_CLIENT_ID`.
-4. Restart the stack (`docker compose up --build`) to apply the change.
-
-## Active Client Resolution
-
-Both the UI and the proxy read `configs/clients.json` during startup, filter for the client whose `id` matches `ACTIVE_CLIENT_ID`, and expose that configuration at runtime. Switching customers is a deployment-time decision—update the environment variable and restart the containers to target a different client.
+Prefer to manage a richer JSON definition? Drop the file in the container (or mount it) and point `CLIENT_CONFIG_PATH` at its location. When the file exists, the proxy honours it while still allowing the environment overrides above.
 
 ## Per-deployment Branding Overrides
 
-When you only need to adjust the active client's branding for a specific deployment, set any of these optional values in `.env` instead of editing `configs/clients.json`:
+All overrides are environment-driven. Update the optional variables listed above and redeploy; the proxy regenerates the client configuration on the next start and the UI reflects the new branding after a refresh.
 
-- `ACTIVE_CLIENT_WELCOME_MESSAGE`
-- `ACTIVE_CLIENT_PRIMARY_COLOR`
-- `ACTIVE_CLIENT_LOGO_URL`
-- `ACTIVE_CLIENT_BACKGROUND_IMAGE_URL`
+## UI Connectivity
 
-The proxy merges these overrides into the client configuration it serves to the UI, so changes take effect after redeploying the stack.
+- `VITE_API_BASE_URL` points the browser to the proxy. For local Docker runs it should match the host-exposed proxy URL (`http://localhost:8010`). During production deployments, set it to the externally reachable proxy endpoint. When undefined, the UI falls back to `window.location.origin`, which is handy when the UI and proxy share the same origin.
 
 ## Pixie Core Connectivity
 

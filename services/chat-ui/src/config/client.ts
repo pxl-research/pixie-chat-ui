@@ -11,16 +11,20 @@ export type ClientConfig = {
   welcomeMessage?: string;
 };
 
-const DEFAULT_API_BASE_URL = "http://localhost:8010";
+const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
-const apiBaseUrl =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ||
-  DEFAULT_API_BASE_URL;
+const resolvedBaseUrl = configuredBaseUrl && configuredBaseUrl.length > 0
+  ? configuredBaseUrl
+  : (typeof window !== "undefined" ? window.location.origin : undefined);
 
-export const API_BASE_URL = apiBaseUrl;
+if (!resolvedBaseUrl) {
+  throw new Error("VITE_API_BASE_URL is not set and window.location is unavailable to derive the chat proxy URL.");
+}
+
+export const API_BASE_URL = resolvedBaseUrl.replace(/\/$/, "");
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
-  const response = await fetch(`${apiBaseUrl}/client`);
+  const response = await fetch(`${API_BASE_URL}/client`);
   if (!response.ok) {
     throw new Error(`Failed to load client configuration: ${response.statusText}`);
   }
