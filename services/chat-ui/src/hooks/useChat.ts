@@ -2,30 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 
 import { sendChatMessage } from "../api/chat";
 import { parseApiResponse } from "../utils/responseParser";
-import type { AssistantRichContent } from "../utils/responseParser";
+import { ROLE_USER, ROLE_ASSISTANT } from "../constants";
+import type { AssistantRichContent, ChatMessage as ChatMessageType, SearchResultAttribute, SearchResultItem, SearchResultsResponse } from "../types";
 
-export type ChatRole = "user" | "assistant";
+export type ChatMessage = ChatMessageType & { rich?: AssistantRichContent | null };
 
-export type ChatMessage = {
-  role: ChatRole;
-  content: string;
-  rich?: AssistantRichContent | null;
-};
-
-// Re-export types for backward compatibility
-export type {
-  SearchResultAttribute,
-  SearchResultItem,
-  SearchResultsResponse,
-  AssistantRichContent,
-} from "../utils/responseParser";
+// Re-export types for backward compatibility from centralized types
+export type { SearchResultAttribute, SearchResultItem, SearchResultsResponse, AssistantRichContent };
 
 /**
  * Hook for managing chat state and interactions.
  */
 export function useChat(initialAssistantMessage?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>(
-    initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage, rich: null }] : [],
+    initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : [],
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +26,7 @@ export function useChat(initialAssistantMessage?: string) {
     if (initialAssistantMessage === undefined) {
       return;
     }
-    setMessages(initialAssistantMessage ? [{ role: "assistant", content: initialAssistantMessage, rich: null }] : []);
+  setMessages(initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, [initialAssistantMessage]);
@@ -49,7 +39,7 @@ export function useChat(initialAssistantMessage?: string) {
       }
 
       // Add user message to chat
-      setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+  setMessages((prev) => [...prev, { role: ROLE_USER, content: trimmed }]);
       setLoading(true);
       setError(null);
 
@@ -74,7 +64,7 @@ export function useChat(initialAssistantMessage?: string) {
         // Add assistant message to chat
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: parsed.content ?? "", rich: parsed.richContent },
+          { role: ROLE_ASSISTANT, content: parsed.content ?? "", rich: parsed.richContent },
         ]);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
@@ -88,7 +78,7 @@ export function useChat(initialAssistantMessage?: string) {
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
-    setMessages(welcomeMessage ? [{ role: "assistant", content: welcomeMessage, rich: null }] : []);
+  setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, []);

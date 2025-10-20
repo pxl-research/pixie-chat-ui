@@ -50,17 +50,21 @@ function App() {
   }
 
   const backgroundImage = client.theme.backgroundImageUrl;
-  const appStyle = backgroundImage
+  const backgroundStyle = backgroundImage
     ? {
         backgroundImage: `linear-gradient(rgba(249,250,251,0.65), rgba(249,250,251,0.65)), url(${backgroundImage})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
       }
-    : undefined;
+    : {};
+
+  const themeStyle: React.CSSProperties = client.theme.primaryColor
+    ? ({ ["--primary-color"]: client.theme.primaryColor } as React.CSSProperties)
+    : {};
 
   return (
-    <div className="app" style={appStyle}>
+    <div className="app" style={{ ...backgroundStyle, ...themeStyle }}>
       <Header displayName={client.displayName} theme={client.theme} onNewConversation={handleNewConversation} disableActions={loading} />
       <main>
         <ChatWindow
@@ -69,7 +73,6 @@ function App() {
           onSend={sendMessage}
           loading={loading}
           error={error}
-          theme={client.theme}
         />
       </main>
     </div>

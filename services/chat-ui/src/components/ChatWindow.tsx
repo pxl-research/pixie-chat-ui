@@ -2,8 +2,8 @@ import { useState } from "react";
 
 import type { FormEvent } from "react";
 
-import type { ClientTheme } from "../config/client";
-import type { ChatMessage } from "../hooks/useChat";
+import type { ChatMessage } from "../types";
+import { ROLE_USER, SEARCH_RESULTS } from "../constants";
 import { SearchResultsCarousel } from "./SearchResultsCarousel";
 
 type ChatWindowProps = {
@@ -11,13 +11,12 @@ type ChatWindowProps = {
   onSend: (content: string) => Promise<void> | void;
   loading: boolean;
   error: string | null;
-  theme: ClientTheme;
 };
 
-export function ChatWindow({ messages, onSend, loading, error, theme }: ChatWindowProps) {
+export function ChatWindow({ messages, onSend, loading, error }: ChatWindowProps) {
   const [draft, setDraft] = useState("");
 
-  const primaryColor = theme.primaryColor || "#1f2937";
+  // theme primary color is applied at the app root as CSS variable --primary-color
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,9 +37,9 @@ export function ChatWindow({ messages, onSend, loading, error, theme }: ChatWind
           <>
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                <span className="role">{message.role === "user" ? "You" : "Pixie"}</span>
+                <span className="role">{message.role === ROLE_USER ? "You" : "Pixie"}</span>
                 {message.content ? <p>{message.content}</p> : null}
-                {message.rich?.type === "search-results" ? (
+                {message.rich?.type === SEARCH_RESULTS ? (
                   <SearchResultsCarousel results={message.rich.results} />
                 ) : null}
               </div>
@@ -73,7 +72,7 @@ export function ChatWindow({ messages, onSend, loading, error, theme }: ChatWind
           onChange={(event) => setDraft(event.target.value)}
           disabled={loading}
         />
-        <button type="submit" disabled={loading || draft.trim().length === 0} style={{ backgroundColor: primaryColor }}>
+        <button type="submit" className="composer__send" disabled={loading || draft.trim().length === 0}>
           {loading ? "Sending..." : "Send"}
         </button>
       </form>

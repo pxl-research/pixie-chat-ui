@@ -1,29 +1,13 @@
 import type { ChatApiResponse } from "../api/chat";
-
-export type SearchResultAttribute = {
-  name: string;
-  label?: string;
-  value: unknown;
-};
-
-export type SearchResultItem = {
-  brand?: string;
-  price?: number;
-  availability?: boolean;
-  attributes?: SearchResultAttribute[];
-};
-
-export type SearchResultsResponse = {
-  total?: number;
-  count?: number;
-  items?: SearchResultItem[];
-  [key: string]: unknown;
-};
-
-export type AssistantRichContent = {
-  type: "search-results";
-  results: SearchResultsResponse;
-};
+import type { SearchResultsResponse, AssistantRichContent } from "../types";
+import {
+  RESPONSE_ASK_USER,
+  RESPONSE_ANSWER,
+  RESPONSE_NO_RESULTS,
+  RESPONSE_NOT_RELEVANT,
+  RESPONSE_ERROR,
+  SEARCH_RESULTS,
+} from "../constants";
 
 export type ParsedResponse = {
   content: string | null;
@@ -37,7 +21,7 @@ export type ParsedResponse = {
  * Parse the API response and extract relevant data for the UI.
  */
 export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
-  const responseType = data?.type ?? "answer";
+  const responseType = data?.type ?? RESPONSE_ANSWER;
   const conversationId = data?.conversationId ?? null;
   
   let content: string | null = null;
@@ -46,20 +30,20 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   let error: string | undefined;
 
   switch (responseType) {
-    case "ask_user":
+  case RESPONSE_ASK_USER:
       // Backend is asking a follow-up question
       content = data?.prompt ?? "Kun je wat meer details delen?";
       shouldContinueConversation = true;
       break;
 
-    case "answer":
-    case "no_results":
-    case "not_relevant":
+  case RESPONSE_ANSWER:
+  case RESPONSE_NO_RESULTS:
+  case RESPONSE_NOT_RELEVANT:
       // Try to parse search results from answer text
-      if (responseType === "answer" && typeof data?.text === "string") {
+  if (responseType === RESPONSE_ANSWER && typeof data?.text === "string") {
         const parsed = tryParseSearchResults(data.text);
         if (parsed) {
-          richContent = { type: "search-results", results: parsed };
+          richContent = { type: SEARCH_RESULTS, results: parsed };
           content = null;
         } else {
           content = data.text;
@@ -69,7 +53,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       }
       break;
 
-    case "error":
+    case RESPONSE_ERROR:
       content = data?.reason ?? "Pixie Core gaf een foutmelding.";
       error = data?.reason ?? "Pixie Core gaf een foutmelding.";
       break;

@@ -11,19 +11,26 @@ export type ClientConfig = {
   welcomeMessage?: string;
 };
 
-const runtimeBaseUrl =
-  typeof window !== "undefined" ? window.__ENV__?.API_BASE_URL?.trim() : undefined;
+// Resolve API base URL (preferences):
+// 1. Runtime configuration written to window.__ENV__.API_BASE_URL (recommended)
+// 2. Vite build-time variable VITE_API_BASE_URL (optional)
+// 3. Fallback to window.location.origin for co-hosted deployments
+function getRuntimeBaseUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const runtime = window.__ENV__?.API_BASE_URL;
+  return typeof runtime === "string" && runtime.trim().length > 0 ? runtime.trim() : undefined;
+}
 
-const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+function getConfiguredBaseUrl(): string | undefined {
+  const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined) || undefined;
+  return configured && configured.trim().length > 0 ? configured.trim() : undefined;
+}
 
-const resolvedBaseUrl =
-  (runtimeBaseUrl && runtimeBaseUrl.length > 0 && runtimeBaseUrl) ||
-  (configuredBaseUrl && configuredBaseUrl.length > 0 && configuredBaseUrl) ||
-  (typeof window !== "undefined" ? window.location.origin : undefined);
+const resolvedBaseUrl = getRuntimeBaseUrl() ?? getConfiguredBaseUrl() ?? (typeof window !== "undefined" ? window.location.origin : undefined);
 
 if (!resolvedBaseUrl) {
   throw new Error(
-    "Unable to determine chat proxy URL. Set VITE_API_BASE_URL or expose window.__ENV.API_BASE_URL."
+    "Unable to determine chat proxy URL. Provide window.__ENV__.API_BASE_URL or set VITE_API_BASE_URL at build time."
   );
 }
 

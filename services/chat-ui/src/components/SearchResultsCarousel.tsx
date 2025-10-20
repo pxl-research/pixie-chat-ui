@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import type { SearchResultItem, SearchResultsResponse } from "../hooks/useChat";
+import type { SearchResultItem, SearchResultsResponse } from "../types";
 
 type SearchResultsCarouselProps = {
   results: SearchResultsResponse;
