@@ -199,7 +199,9 @@ Target: Vite + React (fast cold-start, simple).
 
 ### 4.3 Proxy Settings
 
-Expose `VITE_API_BASE_URL` in the UI environment so the bundle knows how to reach the proxy. During local development it typically points to `http://localhost:8010`; in production match the externally reachable proxy URL. When left undefined the UI falls back to `window.location.origin`, which keeps things working when the proxy and UI share a host.
+- Keep `VITE_API_BASE_URL` in the environment; the UI copies it into a runtime script (`/env-config.js`) right before the preview server starts so you can swap proxy endpoints without rebuilding the image.
+- If you launch the UI outside of Docker, run `node scripts/inject-runtime-config.mjs` after `npm run build` to regenerate `dist/env-config.js` with the current environment values.
+- When no runtime value is present, the bundle falls back to the compile-time `VITE_API_BASE_URL` and finally `window.location.origin`, which keeps co-hosted deployments working.
 
 ### 4.4 `Dockerfile`
 
@@ -210,7 +212,7 @@ COPY package.json package-lock.json ./
 RUN npm install --frozen-lockfile
 COPY . .
 RUN npm run build
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["sh", "-c", "node scripts/inject-runtime-config.mjs && npm run preview -- --host 0.0.0.0 --port 3000"]
 ```
 
 ---

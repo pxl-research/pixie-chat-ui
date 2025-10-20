@@ -11,14 +11,20 @@ export type ClientConfig = {
   welcomeMessage?: string;
 };
 
+const runtimeBaseUrl =
+  typeof window !== "undefined" ? window.__ENV__?.API_BASE_URL?.trim() : undefined;
+
 const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
-const resolvedBaseUrl = configuredBaseUrl && configuredBaseUrl.length > 0
-  ? configuredBaseUrl
-  : (typeof window !== "undefined" ? window.location.origin : undefined);
+const resolvedBaseUrl =
+  (runtimeBaseUrl && runtimeBaseUrl.length > 0 && runtimeBaseUrl) ||
+  (configuredBaseUrl && configuredBaseUrl.length > 0 && configuredBaseUrl) ||
+  (typeof window !== "undefined" ? window.location.origin : undefined);
 
 if (!resolvedBaseUrl) {
-  throw new Error("VITE_API_BASE_URL is not set and window.location is unavailable to derive the chat proxy URL.");
+  throw new Error(
+    "Unable to determine chat proxy URL. Set VITE_API_BASE_URL or expose window.__ENV.API_BASE_URL."
+  );
 }
 
 export const API_BASE_URL = resolvedBaseUrl.replace(/\/$/, "");

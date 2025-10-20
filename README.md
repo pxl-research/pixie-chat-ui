@@ -46,7 +46,9 @@ All overrides are environment-driven. Update the optional variables listed above
 
 ## UI Connectivity
 
-- `VITE_API_BASE_URL` points the browser to the proxy. For local Docker runs it should match the host-exposed proxy URL (`http://localhost:8010`). During production deployments, set it to the externally reachable proxy endpoint. When undefined, the UI falls back to `window.location.origin`, which is handy when the UI and proxy share the same origin.
+- `VITE_API_BASE_URL` is still accepted at build time, but the UI now prefers runtime configuration sourced from `/env-config.js` (materialised inside the container before the preview server starts). Set `VITE_API_BASE_URL` in `.env` so the injection script can mirror it; the page then reads `window.__ENV.API_BASE_URL` and talks to the proxy without rebuilding the image.
+- Running the UI outside Docker? Execute `node scripts/inject-runtime-config.mjs` after `npm run build` (or just before `npm run preview`) to write `dist/env-config.js` based on the current environment.
+- If neither runtime nor build-time values are present, the bundle falls back to `window.location.origin`, which keeps co-hosted deployments working.
 
 ## Pixie Core Connectivity
 
