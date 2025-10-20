@@ -38,8 +38,8 @@ jobs:
           image="${owner}/${repo_name}"
           echo "name=${image}" >> "$GITHUB_OUTPUT"
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Extract Docker metadata (chat-ui)
+        id: meta-ui
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
@@ -47,11 +47,29 @@ jobs:
             type=ref,event=branch
             type=sha
 
-      - name: Build and push Docker image
+      - name: Build and push chat-ui image
         uses: docker/build-push-action@v6
         with:
           context: ./services/chat-ui
           file: ./services/chat-ui/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-ui.outputs.tags }}
+          labels: ${{ steps.meta-ui.outputs.labels }}
+
+      - name: Extract Docker metadata (chat-proxy)
+        id: meta-proxy
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}-proxy
+          tags: |
+            type=ref,event=branch
+            type=sha
+
+      - name: Build and push chat-proxy image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/chat-proxy
+          file: ./services/chat-proxy/Dockerfile
+          push: true
+          tags: ${{ steps.meta-proxy.outputs.tags }}
+          labels: ${{ steps.meta-proxy.outputs.labels }}

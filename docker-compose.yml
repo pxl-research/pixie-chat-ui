@@ -1,5 +1,6 @@
 services:
   proxy:
+    image: ${CHAT_PROXY_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui-proxy:main}
     build:
       context: ./services/chat-proxy
     container_name: chat-proxy
@@ -15,6 +16,7 @@ services:
       - pixie
 
   ui:
+    image: ${CHAT_UI_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui:main}
     build:
       context: ./services/chat-ui
     container_name: chat-ui
