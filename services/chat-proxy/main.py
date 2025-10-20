@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
-from bootstrap import build_client_definition, ensure_client_config_file
+from bootstrap import collect_theme_overrides, build_client_definition, ensure_client_config_file
 
 app = FastAPI()
 
@@ -55,17 +55,7 @@ CLIENT = load_client_config()
 
 def build_client_payload() -> Dict[str, Any]:
     theme = dict(CLIENT.get("theme", {}))
-    override_primary = os.environ.get("ACTIVE_CLIENT_PRIMARY_COLOR")
-    if override_primary:
-        theme["primaryColor"] = override_primary
-
-    override_logo = os.environ.get("ACTIVE_CLIENT_LOGO_URL")
-    if override_logo:
-        theme["logoUrl"] = override_logo
-
-    override_background = os.environ.get("ACTIVE_CLIENT_BACKGROUND_IMAGE_URL")
-    if override_background:
-        theme["backgroundImageUrl"] = override_background
+    theme.update(collect_theme_overrides())
 
     welcome_message = os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE") or CLIENT.get("welcomeMessage")
     display_name = os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME") or CLIENT.get("displayName") or CLIENT["id"]

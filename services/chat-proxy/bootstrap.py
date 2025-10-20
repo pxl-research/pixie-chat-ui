@@ -6,6 +6,21 @@ import json
 import os
 from pathlib import Path
 
+THEME_ENV_TO_FIELD = {
+    "ACTIVE_CLIENT_PRIMARY_COLOR": "primaryColor",
+    "ACTIVE_CLIENT_LOGO_URL": "logoUrl",
+    "ACTIVE_CLIENT_BACKGROUND_IMAGE_URL": "backgroundImageUrl",
+}
+
+
+def collect_theme_overrides() -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for env_name, field in THEME_ENV_TO_FIELD.items():
+        value = os.environ.get(env_name)
+        if value:
+            overrides[field] = value
+    return overrides
+
 
 def _required_env(name: str) -> str:
     try:
@@ -19,16 +34,7 @@ def build_client_definition() -> dict:
     client_display = os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", client_id)
     collection = os.environ.get("ACTIVE_CLIENT_COLLECTION_ID")
 
-    theme: dict[str, str] = {}
-    theme_overrides = {
-        "ACTIVE_CLIENT_PRIMARY_COLOR": "primaryColor",
-        "ACTIVE_CLIENT_LOGO_URL": "logoUrl",
-        "ACTIVE_CLIENT_BACKGROUND_IMAGE_URL": "backgroundImageUrl",
-    }
-    for env_name, field in theme_overrides.items():
-        value = os.environ.get(env_name)
-        if value:
-            theme[field] = value
+    theme = collect_theme_overrides()
 
     client: dict[str, object] = {
         "id": client_id,

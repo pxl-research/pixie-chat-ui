@@ -12,6 +12,10 @@ const currencyFormatter = new Intl.NumberFormat("nl-BE", {
   minimumFractionDigits: 2,
 });
 
+function cleanString(value?: string | null): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function formatValue(value: unknown): string {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value.toString() : "";
@@ -30,25 +34,51 @@ type AttributeSchemaEntry = {
   label: string;
 };
 
-function attributeKey(attribute: SearchResultAttribute, fallbackIndex: number): string | null {
-  if (typeof attribute.name === "string" && attribute.name.trim().length > 0) {
-    return attribute.name;
-  }
-  if (typeof attribute.label === "string" && attribute.label.trim().length > 0) {
-    return attribute.label;
-  }
-  return `attribute-${fallbackIndex}`;
+function resolveAttributeKey(attribute: SearchResultAttribute, fallbackIndex: number): string {
+  return cleanString(attribute.name) || cleanString(attribute.label) || `attribute-${fallbackIndex}`;
+}
+
+function resolveAttributeLabel(attribute: SearchResultAttribute, fallbackIndex: number): string {
+  return cleanString(attribute.label) || cleanString(attribute.name) || `attribute-${fallbackIndex}`;
+}
+
+function buildAttributeSchema(items: SearchResultItem[]): AttributeSchemaEntry[] {
+  const schema = new Map<string, { key: string; label: string; count: number }>();
+
+  items.forEach((item) => {
+    (item.attributes ?? []).forEach((attribute, index) => {
+      const key = resolveAttributeKey(attribute, index);
+      const label = resolveAttributeLabel(attribute, index);
+      const existing = schema.get(key);
+
+      if (existing) {
+        existing.count += 1;
+        if (label.length > existing.label.length) {
+          existing.label = label;
+        }
+      } else {
+        schema.set(key, { key, label, count: 1 });
+      }
+    });
+  });
+
+  return Array.from(schema.values())
+    .sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.label.localeCompare(b.label);
+    })
+    .map(({ key, label }) => ({ key, label }));
 }
 
 function ResultCard({ item, schema }: { item: SearchResultItem; schema: AttributeSchemaEntry[] }) {
-  const attributeMap = new Map<string, SearchResultAttribute>();
+  const attributeMap: Record<string, SearchResultAttribute> = {};
+
   (item.attributes ?? []).forEach((attribute, index) => {
-    const key = attributeKey(attribute, index);
-    if (!key) {
-      return;
-    }
-    if (!attributeMap.has(key)) {
-      attributeMap.set(key, attribute);
+    const key = resolveAttributeKey(attribute, index);
+    if (!(key in attributeMap)) {
+      attributeMap[key] = attribute;
     }
   });
 
@@ -67,7 +97,7 @@ function ResultCard({ item, schema }: { item: SearchResultItem; schema: Attribut
       </header>
       <dl>
         {schema.map((schemaEntry, index) => {
-          const attribute = attributeMap.get(schemaEntry.key);
+          const attribute = attributeMap[schemaEntry.key];
           const value = attribute ? formatValue(attribute.value) : "";
           const content = value || "—";
           return (
@@ -84,39 +114,7 @@ function ResultCard({ item, schema }: { item: SearchResultItem; schema: Attribut
 
 export function SearchResultsCarousel({ results }: SearchResultsCarouselProps) {
   const items = useMemo(() => results.items?.filter(Boolean) ?? [], [results.items]);
-  const attributeSchema = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number; shortestLabel: string }>();
-    items.forEach((item) => {
-      (item.attributes ?? []).forEach((attribute, index) => {
-        const key = attributeKey(attribute, index);
-        if (!key) {
-          return;
-        }
-        const labelCandidate =
-          (typeof attribute.label === "string" && attribute.label.trim().length > 0 && attribute.label) ||
-          (typeof attribute.name === "string" && attribute.name.trim().length > 0 && attribute.name) ||
-          key;
-        const existing = map.get(key);
-        if (existing) {
-          existing.count += 1;
-          if (existing.label.length < labelCandidate.length) {
-            existing.label = labelCandidate;
-          }
-        } else {
-          map.set(key, { key, label: labelCandidate, count: 1, shortestLabel: labelCandidate });
-        }
-      });
-    });
-
-    return Array.from(map.values())
-      .sort((a, b) => {
-        if (b.count !== a.count) {
-          return b.count - a.count;
-        }
-        return a.label.localeCompare(b.label);
-      })
-      .map(({ key, label }) => ({ key, label }));
-  }, [items]);
+  const attributeSchema = useMemo(() => buildAttributeSchema(items), [items]);
   const [index, setIndex] = useState(0);
 
   if (items.length === 0) {
