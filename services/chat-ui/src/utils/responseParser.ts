@@ -67,6 +67,11 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       break;
   }
 
+  // Prevent empty assistant responses in the UI
+  if (!content && !richContent) {
+    content = "Geen antwoord beschikbaar.";
+  }
+
   return {
     content,
     richContent,

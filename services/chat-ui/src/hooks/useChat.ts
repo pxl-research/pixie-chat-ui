@@ -66,11 +66,16 @@ export function useChat(initialAssistantMessage?: string) {
           setError(parsed.error);
         }
 
-        // Add assistant message to chat
-        setMessages((prev) => [
-          ...prev,
-          { role: ROLE_ASSISTANT, content: parsed.content ?? "", rich: parsed.richContent },
-        ]);
+        const assistantContent = parsed.content?.trim() ?? "";
+        const hasAssistantMessage = assistantContent.length > 0 || parsed.richContent;
+
+        // Add assistant message to chat only if we have something to show
+        if (hasAssistantMessage) {
+          setMessages((prev) => [
+            ...prev,
+            { role: ROLE_ASSISTANT, content: assistantContent, rich: parsed.richContent },
+          ]);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
         setError(message);
