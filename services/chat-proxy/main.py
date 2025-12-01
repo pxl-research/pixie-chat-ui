@@ -10,9 +10,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI()
 
+def _parse_origins(raw: str) -> list[str]:
+    if raw.strip() == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+ALLOWED_ORIGINS = _parse_origins(os.environ.get("CORS_ALLOW_ORIGINS", "*"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -43,19 +50,14 @@ if not _client_id:
 ACTIVE_CLIENT_ID: str = _client_id
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
-BACKEND_BASE_URL: str = (
-    PIXIE_CORE_API_BASE_URL if PIXIE_TARGET_BACKEND == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[arg-type]
-)
+BACKEND_BASE_URL: str = PIXIE_CORE_API_BASE_URL if PIXIE_TARGET_BACKEND == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[assignment]
 
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
 
 BackendHealth = Dict[str, Optional[Any]]
-_backend_health: BackendHealth = {
-    "status": "unknown",
-    "detail": None,
-    "checked_at": None,
-}
+_backend_health: BackendHealth = {"status": "unknown", "detail": None, "checked_at": None}
+_http_client: Optional[httpx.AsyncClient] = None
 
 
 def build_client_payload() -> Dict[str, Any]:
@@ -87,6 +89,11 @@ async def client() -> Dict[str, Any]:
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
+async def get_http_client() -> httpx.AsyncClient:
+    if _http_client is None:
+        raise RuntimeError("HTTP client not initialized")
+    return _http_client
+
 
 async def refresh_backend_health(force: bool = False) -> BackendHealth:
     """Check backend /health endpoint and cache the result briefly."""
@@ -98,12 +105,10 @@ async def refresh_backend_health(force: bool = False) -> BackendHealth:
     ):
         return _backend_health
 
-    url = f"{BACKEND_BASE_URL}{HEALTH_PATH}"
-
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        client = await get_http_client()
+        response = await client.get(HEALTH_PATH, timeout=3.0)
+        response.raise_for_status()
         _backend_health = {
             "status": "healthy",
             "detail": None,
@@ -127,7 +132,17 @@ async def ensure_backend_ready() -> None:
 
 @app.on_event("startup")
 async def startup_check() -> None:
+    global _http_client
+    _http_client = httpx.AsyncClient(base_url=BACKEND_BASE_URL, timeout=30.0)
     await refresh_backend_health(force=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_client() -> None:
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
 
 
 @app.get("/health")
@@ -147,24 +162,22 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
     if PIXIE_API_KEY:
         headers["Authorization"] = f"Bearer {PIXIE_API_KEY}"
 
-    async with httpx.AsyncClient(
-        base_url=PIXIE_CORE_API_BASE_URL, timeout=30.0
-    ) as client:
+    client = await get_http_client()
+    try:
+        response = await client.post("/ask", json=payload, headers=headers)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
         try:
-            response = await client.post("/ask", json=payload, headers=headers)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            try:
-                detail = exc.response.json()
-            except ValueError:
-                detail = exc.response.text
-            raise HTTPException(
-                status_code=exc.response.status_code, detail=detail
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise HTTPException(
-                status_code=502, detail=f"Error reaching Pixie Core: {exc}"
-            ) from exc
+            detail = exc.response.json()
+        except ValueError:
+            detail = exc.response.text
+        raise HTTPException(
+            status_code=exc.response.status_code, detail=detail
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Error reaching Pixie Core: {exc}"
+        ) from exc
 
     try:
         data = response.json()
@@ -197,24 +210,22 @@ async def call_informer(question: str, session_id: str, history: List[str] | Non
         "history": history or [],
     }
 
-    async with httpx.AsyncClient(
-        base_url=PIXIE_INFORMER_API_BASE_URL, timeout=30.0
-    ) as client:
+    client = await get_http_client()
+    try:
+        response = await client.post("/ask", json=payload)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
         try:
-            response = await client.post("/ask", json=payload)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            try:
-                detail = exc.response.json()
-            except ValueError:
-                detail = exc.response.text
-            raise HTTPException(
-                status_code=exc.response.status_code, detail=detail
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise HTTPException(
-                status_code=502, detail=f"Error reaching Pixie Informer: {exc}"
-            ) from exc
+            detail = exc.response.json()
+        except ValueError:
+            detail = exc.response.text
+        raise HTTPException(
+            status_code=exc.response.status_code, detail=detail
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Error reaching Pixie Informer: {exc}"
+        ) from exc
 
     try:
         data = response.json()
