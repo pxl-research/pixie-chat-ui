@@ -1,5 +1,6 @@
 import os
-from typing import Any, Dict, List
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import httpx
@@ -42,6 +43,19 @@ if not _client_id:
 ACTIVE_CLIENT_ID: str = _client_id
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
+BACKEND_BASE_URL: str = (
+    PIXIE_CORE_API_BASE_URL if PIXIE_TARGET_BACKEND == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[arg-type]
+)
+
+HEALTH_PATH = "/health"
+HEALTH_CACHE_SECONDS = 15
+
+BackendHealth = Dict[str, Optional[Any]]
+_backend_health: BackendHealth = {
+    "status": "unknown",
+    "detail": None,
+    "checked_at": None,
+}
 
 
 def build_client_payload() -> Dict[str, Any]:
@@ -68,6 +82,64 @@ def build_client_payload() -> Dict[str, Any]:
 async def client() -> Dict[str, Any]:
     """Expose active client branding and identifiers to the UI."""
     return build_client_payload()
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def refresh_backend_health(force: bool = False) -> BackendHealth:
+    """Check backend /health endpoint and cache the result briefly."""
+    global _backend_health
+    if (
+        not force
+        and _backend_health["checked_at"]
+        and (_now() - _backend_health["checked_at"]) < timedelta(seconds=HEALTH_CACHE_SECONDS)  # type: ignore[operator]
+    ):
+        return _backend_health
+
+    url = f"{BACKEND_BASE_URL}{HEALTH_PATH}"
+
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+        _backend_health = {
+            "status": "healthy",
+            "detail": None,
+            "checked_at": _now(),
+        }
+    except httpx.HTTPError as exc:
+        _backend_health = {
+            "status": "unhealthy",
+            "detail": f"Health check failed: {exc}",
+            "checked_at": _now(),
+        }
+
+    return _backend_health
+
+
+async def ensure_backend_ready() -> None:
+    state = await refresh_backend_health()
+    if state["status"] != "healthy":
+        raise HTTPException(status_code=503, detail=state["detail"] or "Configured Pixie backend is not reachable.")
+
+
+@app.on_event("startup")
+async def startup_check() -> None:
+    await refresh_backend_health(force=True)
+
+
+@app.get("/health")
+async def health() -> Dict[str, Any]:
+    state = await refresh_backend_health()
+    return {
+        "status": state["status"],
+        "targetBackend": PIXIE_TARGET_BACKEND,
+        "backendUrl": BACKEND_BASE_URL,
+        "detail": state["detail"],
+        "checkedAt": state["checked_at"].isoformat() if state["checked_at"] else None,
+    }
 
 
 async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -165,6 +237,8 @@ async def chat(payload: ChatRequest) -> Dict[str, Any]:
     user_input = payload.user_input.strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Input may not be empty.")
+
+    await ensure_backend_ready()
 
     if PIXIE_TARGET_BACKEND == "informer":
         session_id = payload.conversation_id or str(uuid4())

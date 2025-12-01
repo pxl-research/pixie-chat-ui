@@ -14,9 +14,10 @@ export type ClientConfig = {
 // Resolve API base URL (preferences):
 // 1. Runtime configuration written to window.__ENV__.API_BASE_URL (recommended)
 // 2. Vite build-time variable VITE_API_BASE_URL (optional)
-// 3. Fallback to window.location.origin for co-hosted deployments
 function getRuntimeBaseUrl(): string | undefined {
-  if (typeof window === "undefined") return undefined;
+  if (typeof window === "undefined") {
+    return undefined;
+  }
   const runtime = window.__ENV__?.API_BASE_URL;
   return typeof runtime === "string" && runtime.trim().length > 0 ? runtime.trim() : undefined;
 }
@@ -26,15 +27,26 @@ function getConfiguredBaseUrl(): string | undefined {
   return configured && configured.trim().length > 0 ? configured.trim() : undefined;
 }
 
-const resolvedBaseUrl = getRuntimeBaseUrl() ?? getConfiguredBaseUrl() ?? (typeof window !== "undefined" ? window.location.origin : undefined);
+function normalizeBaseUrl(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.replace(/\/$/, "");
+}
+
+const resolvedBaseUrl = normalizeBaseUrl(getRuntimeBaseUrl()) ?? normalizeBaseUrl(getConfiguredBaseUrl());
 
 if (!resolvedBaseUrl) {
   throw new Error(
-    "Unable to determine chat proxy URL. Provide window.__ENV__.API_BASE_URL or set VITE_API_BASE_URL at build time."
+    "Unable to determine chat proxy URL. Provide window.__ENV__.API_BASE_URL at runtime or set VITE_API_BASE_URL at build time."
   );
 }
 
-export const API_BASE_URL = resolvedBaseUrl.replace(/\/$/, "");
+export const API_BASE_URL = resolvedBaseUrl;
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
   const response = await fetch(`${API_BASE_URL}/client`);

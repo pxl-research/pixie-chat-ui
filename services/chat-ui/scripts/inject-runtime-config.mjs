@@ -7,13 +7,19 @@ async function main() {
   const distDir = join(scriptDir, "..", "dist");
   const targetPath = join(distDir, "env-config.js");
 
-  const apiBaseUrl =
-    process.env.VITE_API_BASE_URL ||
-    process.env.API_BASE_URL ||
-    "";
+  const apiBaseUrl = [process.env.VITE_API_BASE_URL, process.env.API_BASE_URL].find(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  if (!apiBaseUrl) {
+    console.error("[runtime-config] Missing API_BASE_URL. Set API_BASE_URL or VITE_API_BASE_URL before starting the UI.");
+    process.exit(1);
+  }
+
+  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/$/, "");
 
   const payload = {
-    API_BASE_URL: apiBaseUrl,
+    API_BASE_URL: normalizedBaseUrl,
   };
 
   const content = `window.__ENV__ = Object.assign({}, window.__ENV__, ${JSON.stringify(payload, null, 2)});\n`;
@@ -21,8 +27,7 @@ async function main() {
   await mkdir(distDir, { recursive: true });
   await writeFile(targetPath, content, "utf8");
 
-  const obfuscated = apiBaseUrl ? apiBaseUrl : "<empty>";
-  console.log(`[runtime-config] Wrote env-config.js with API_BASE_URL=${obfuscated}`);
+  console.log(`[runtime-config] Wrote env-config.js with API_BASE_URL=${normalizedBaseUrl}`);
 }
 
 main().catch((error) => {
