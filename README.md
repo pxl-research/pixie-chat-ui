@@ -19,3 +19,14 @@ Zo vormt deze repository de zichtbare voorkant van een groter geheel: gebruikers
 ## Wat je als beheerder doet
 
 Je configureert de chat volledig via omgevingsvariabelen: kies de klant, stel kleur en logo in, voeg een welkomstboodschap toe en start de services. Daarna is de chat onmiddellijk beschikbaar en integreert hij vanzelf met de andere PiXie-componenten binnen je omgeving.
+
+### Routeren tussen recommender en informer
+
+Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer aanspreken, voeg dan in `.env` toe:
+
+```
+PIXIE_TARGET_BACKEND=informer
+PIXIE_INFORMER_API_BASE_URL=http://pixie-informer:8000
+```
+
+Laat je de standaard staan, zorg dan dat `PIXIE_CORE_API_BASE_URL` (of `PIXIE_API_BASE_URL`) naar de recommender wijst. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.

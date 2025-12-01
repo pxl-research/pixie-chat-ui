@@ -1,6 +1,6 @@
-from typing import Any, Dict
-
 import os
+from typing import Any, Dict, List
+from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -16,13 +16,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Validate required environment variables
-_pixie_url = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get(
-    "PIXIE_API_BASE_URL"
-)
-if not _pixie_url:
-    raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
-PIXIE_CORE_API_BASE_URL: str = _pixie_url.rstrip("/")
+# Determine target backend (recommender or informer)
+PIXIE_TARGET_BACKEND = os.environ.get("PIXIE_TARGET_BACKEND", "recommender").strip().lower()
+if PIXIE_TARGET_BACKEND not in {"recommender", "informer"}:
+    raise RuntimeError("PIXIE_TARGET_BACKEND must be either 'recommender' or 'informer'")
+
+# Validate required environment variables per backend
+PIXIE_CORE_API_BASE_URL = None
+PIXIE_INFORMER_API_BASE_URL = None
+
+if PIXIE_TARGET_BACKEND == "recommender":
+    _pixie_url = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get("PIXIE_API_BASE_URL")
+    if not _pixie_url:
+        raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
+    PIXIE_CORE_API_BASE_URL = _pixie_url.rstrip("/")
+else:
+    _pixie_informer_url = os.environ.get("PIXIE_INFORMER_API_BASE_URL")
+    if not _pixie_informer_url:
+        raise RuntimeError("PIXIE_INFORMER_API_BASE_URL environment variable is required when PIXIE_TARGET_BACKEND='informer'")
+    PIXIE_INFORMER_API_BASE_URL = _pixie_informer_url.rstrip("/")
 
 _client_id = os.environ.get("ACTIVE_CLIENT_ID")
 if not _client_id:
@@ -102,24 +114,75 @@ class ChatRequest(BaseModel):
 
     user_input: str = Field(..., alias="input")
     conversation_id: str | None = Field(default=None, alias="conversationId")
+    history: List[str] | None = None
+
+
+async def call_informer(question: str, session_id: str, history: List[str] | None) -> Dict[str, Any]:
+    """Forward chat request to Pixie Informer `/ask` endpoint."""
+    payload = {
+        "question": question,
+        "session_id": session_id,
+        "history": history or [],
+    }
+
+    async with httpx.AsyncClient(
+        base_url=PIXIE_INFORMER_API_BASE_URL, timeout=30.0
+    ) as client:
+        try:
+            response = await client.post("/ask", json=payload)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            try:
+                detail = exc.response.json()
+            except ValueError:
+                detail = exc.response.text
+            raise HTTPException(
+                status_code=exc.response.status_code, detail=detail
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"Error reaching Pixie Informer: {exc}"
+            ) from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502, detail="Invalid JSON received from Pixie Informer"
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=502, detail="Unexpected response format from Pixie Informer"
+        )
+
+    return data
 
 
 @app.post("/chat")
 async def chat(payload: ChatRequest) -> Dict[str, Any]:
-    """Forward chat request to Pixie Core `/ask` endpoint for the active client."""
+    """Forward chat request to the configured Pixie backend for the active client."""
     user_input = payload.user_input.strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Input may not be empty.")
 
+    if PIXIE_TARGET_BACKEND == "informer":
+        session_id = payload.conversation_id or str(uuid4())
+        informer_response = await call_informer(
+            question=user_input,
+            session_id=session_id,
+            history=payload.history,
+        )
+        return {
+            "type": "answer",
+            "text": informer_response.get("answer"),
+            "conversationId": session_id,
+        }
+
     if payload.conversation_id:
-        pixie_payload = {
-            "conversation_id": payload.conversation_id,
-            "message": user_input,
-        }
+        pixie_payload = {"conversation_id": payload.conversation_id, "message": user_input}
     else:
-        pixie_payload = {
-            "question": user_input,
-        }
+        pixie_payload = {"question": user_input}
 
     pixie_response = await call_pixie(pixie_payload)
 

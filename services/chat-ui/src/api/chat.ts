@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../config/client";
 export type ChatApiRequest = {
   input: string;
   conversationId?: string | null;
+  history?: string[];
 };
 
 export type ChatApiResponse = {
@@ -19,9 +20,13 @@ export type ChatApiResponse = {
  */
 export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiResponse> {
   const payload: Record<string, unknown> = { input: request.input };
-  
+
   if (request.conversationId) {
     payload.conversationId = request.conversationId;
+  }
+
+  if (request.history) {
+    payload.history = request.history;
   }
 
   const response = await fetch(`${API_BASE_URL}/chat`, {

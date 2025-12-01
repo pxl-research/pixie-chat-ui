@@ -23,10 +23,11 @@ export type ParsedResponse = {
 export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   const responseType = data?.type ?? RESPONSE_ANSWER;
   const conversationId = data?.conversationId ?? null;
+  const hasConversationId = Boolean(conversationId);
   
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
-  let shouldContinueConversation = false;
+  let shouldContinueConversation = hasConversationId;
   let error: string | undefined;
 
   switch (responseType) {
@@ -54,8 +55,9 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       break;
 
     case RESPONSE_ERROR:
-      content = data?.reason ?? "Pixie Core gaf een foutmelding.";
-      error = data?.reason ?? "Pixie Core gaf een foutmelding.";
+      content = data?.reason ?? "Pixie backend gaf een foutmelding.";
+      error = data?.reason ?? "Pixie backend gaf een foutmelding.";
+      shouldContinueConversation = false;
       break;
 
     default:

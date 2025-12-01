@@ -26,7 +26,7 @@ export function useChat(initialAssistantMessage?: string) {
     if (initialAssistantMessage === undefined) {
       return;
     }
-  setMessages(initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : []);
+    setMessages(initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, [initialAssistantMessage]);
@@ -38,8 +38,12 @@ export function useChat(initialAssistantMessage?: string) {
         return;
       }
 
+      const history = messages
+        .map((message) => message.content?.trim())
+        .filter((value): value is string => Boolean(value));
+
       // Add user message to chat
-  setMessages((prev) => [...prev, { role: ROLE_USER, content: trimmed }]);
+      setMessages((prev) => [...prev, { role: ROLE_USER, content: trimmed }]);
       setLoading(true);
       setError(null);
 
@@ -48,6 +52,7 @@ export function useChat(initialAssistantMessage?: string) {
         const apiResponse = await sendChatMessage({
           input: trimmed,
           conversationId,
+          history,
         });
 
         // Parse response
@@ -74,11 +79,11 @@ export function useChat(initialAssistantMessage?: string) {
         setLoading(false);
       }
     },
-    [conversationId],
+    [conversationId, messages],
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
-  setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
+    setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
     setError(null);
     setConversationId(null);
   }, []);
