@@ -22,11 +22,18 @@ Je configureert de chat volledig via omgevingsvariabelen: kies de klant, stel kl
 
 ### Routeren tussen recommender en informer
 
-Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer aanspreken, voeg dan in `.env` toe:
+Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer aanspreken, zet dan in `.env.dev`:
 
 ```
-PIXIE_TARGET_BACKEND=informer
-PIXIE_INFORMER_API_BASE_URL=http://pixie-informer:8000
+PIXIE_BACKEND_TARGET=informer
 ```
 
-Laat je de standaard staan, zorg dan dat `PIXIE_CORE_API_BASE_URL` (of `PIXIE_API_BASE_URL`) naar de recommender wijst. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
+De basis-URLs voor zowel recommender (`http://recommender-api:8000`) als informer (`http://informer-api:8000`) staan als constant in `services/chat-proxy/main.py`. Pas die in de code aan als je een andere host of poort gebruikt. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
+
+### Ontwikkelen met Docker Compose
+
+Gebruik het env-bestand `.env.dev` in de projectroot (kopieer `.env.example` indien nodig) en de compose-file `infra/docker/docker-compose.dev.yml`:
+
+```
+docker compose -f infra/docker/docker-compose.dev.yml up --build
+```

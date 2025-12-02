@@ -2,21 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+const DEFAULT_API_BASE_URL = "http://localhost:8010";
+
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const distDir = join(scriptDir, "..", "dist");
   const targetPath = join(distDir, "env-config.js");
 
-  const apiBaseUrl = [process.env.VITE_API_BASE_URL, process.env.API_BASE_URL].find(
-    (value) => typeof value === "string" && value.trim().length > 0,
-  );
-
-  if (!apiBaseUrl) {
-    console.error("[runtime-config] Missing API_BASE_URL. Set API_BASE_URL or VITE_API_BASE_URL before starting the UI.");
-    process.exit(1);
-  }
-
-  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/$/, "");
+  const normalizedBaseUrl = DEFAULT_API_BASE_URL.trim().replace(/\/$/, "");
 
   const payload = {
     API_BASE_URL: normalizedBaseUrl,

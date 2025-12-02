@@ -11,42 +11,17 @@ export type ClientConfig = {
   welcomeMessage?: string;
 };
 
-// Resolve API base URL (preferences):
-// 1. Runtime configuration written to window.__ENV__.API_BASE_URL (recommended)
-// 2. Vite build-time variable VITE_API_BASE_URL (optional)
-function getRuntimeBaseUrl(): string | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-  const runtime = window.__ENV__?.API_BASE_URL;
-  return typeof runtime === "string" && runtime.trim().length > 0 ? runtime.trim() : undefined;
-}
+const DEFAULT_API_BASE_URL = "http://localhost:8010";
 
-function getConfiguredBaseUrl(): string | undefined {
-  const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined) || undefined;
-  return configured && configured.trim().length > 0 ? configured.trim() : undefined;
-}
-
-function normalizeBaseUrl(value: string | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
+function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
-    return undefined;
+    throw new Error("DEFAULT_API_BASE_URL must not be empty.");
   }
   return trimmed.replace(/\/$/, "");
 }
 
-const resolvedBaseUrl = normalizeBaseUrl(getRuntimeBaseUrl()) ?? normalizeBaseUrl(getConfiguredBaseUrl());
-
-if (!resolvedBaseUrl) {
-  throw new Error(
-    "Unable to determine chat proxy URL. Provide window.__ENV__.API_BASE_URL at runtime or set VITE_API_BASE_URL at build time."
-  );
-}
-
-export const API_BASE_URL = resolvedBaseUrl;
+export const API_BASE_URL = normalizeBaseUrl(DEFAULT_API_BASE_URL);
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
   const response = await fetch(`${API_BASE_URL}/client`);

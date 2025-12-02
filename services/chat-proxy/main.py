@@ -10,12 +10,22 @@ from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI()
 
+DEFAULT_PIXIE_CORE_API_BASE_URL = "http://recommender-api:8000"
+DEFAULT_PIXIE_INFORMER_API_BASE_URL = "http://informer-api:8000"
+DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
+DEFAULT_BACKEND_TARGET = "recommender"
+
+
+def _normalize_url(raw: str) -> str:
+    return raw.strip().rstrip("/")
+
+
 def _parse_origins(raw: str) -> list[str]:
     if raw.strip() == "*":
         return ["*"]
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
-ALLOWED_ORIGINS = _parse_origins(os.environ.get("CORS_ALLOW_ORIGINS", "*"))
+ALLOWED_ORIGINS = _parse_origins(DEFAULT_CORS_ALLOW_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,24 +35,13 @@ app.add_middleware(
 )
 
 # Determine target backend (recommender or informer)
-PIXIE_TARGET_BACKEND = os.environ.get("PIXIE_TARGET_BACKEND", "recommender").strip().lower()
-if PIXIE_TARGET_BACKEND not in {"recommender", "informer"}:
-    raise RuntimeError("PIXIE_TARGET_BACKEND must be either 'recommender' or 'informer'")
+PIXIE_BACKEND_TARGET = (os.environ.get("PIXIE_BACKEND_TARGET") or DEFAULT_BACKEND_TARGET).strip().lower()
 
-# Validate required environment variables per backend
-PIXIE_CORE_API_BASE_URL = None
-PIXIE_INFORMER_API_BASE_URL = None
+if PIXIE_BACKEND_TARGET not in {"recommender", "informer"}:
+    raise RuntimeError("PIXIE_BACKEND_TARGET must be either 'recommender' or 'informer'")
 
-if PIXIE_TARGET_BACKEND == "recommender":
-    _pixie_url = os.environ.get("PIXIE_CORE_API_BASE_URL") or os.environ.get("PIXIE_API_BASE_URL")
-    if not _pixie_url:
-        raise RuntimeError("PIXIE_CORE_API_BASE_URL environment variable is required")
-    PIXIE_CORE_API_BASE_URL = _pixie_url.rstrip("/")
-else:
-    _pixie_informer_url = os.environ.get("PIXIE_INFORMER_API_BASE_URL")
-    if not _pixie_informer_url:
-        raise RuntimeError("PIXIE_INFORMER_API_BASE_URL environment variable is required when PIXIE_TARGET_BACKEND='informer'")
-    PIXIE_INFORMER_API_BASE_URL = _pixie_informer_url.rstrip("/")
+PIXIE_CORE_API_BASE_URL: str = _normalize_url(DEFAULT_PIXIE_CORE_API_BASE_URL)
+PIXIE_INFORMER_API_BASE_URL: str = _normalize_url(DEFAULT_PIXIE_INFORMER_API_BASE_URL)
 
 _client_id = os.environ.get("ACTIVE_CLIENT_ID")
 if not _client_id:
@@ -50,7 +49,7 @@ if not _client_id:
 ACTIVE_CLIENT_ID: str = _client_id
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
-BACKEND_BASE_URL: str = PIXIE_CORE_API_BASE_URL if PIXIE_TARGET_BACKEND == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[assignment]
+BACKEND_BASE_URL: str = PIXIE_CORE_API_BASE_URL if PIXIE_BACKEND_TARGET == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[assignment]
 
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
@@ -150,7 +149,7 @@ async def health() -> Dict[str, Any]:
     state = await refresh_backend_health()
     return {
         "status": state["status"],
-        "targetBackend": PIXIE_TARGET_BACKEND,
+        "targetBackend": PIXIE_BACKEND_TARGET,
         "backendUrl": BACKEND_BASE_URL,
         "detail": state["detail"],
         "checkedAt": state["checked_at"].isoformat() if state["checked_at"] else None,
@@ -251,7 +250,7 @@ async def chat(payload: ChatRequest) -> Dict[str, Any]:
 
     await ensure_backend_ready()
 
-    if PIXIE_TARGET_BACKEND == "informer":
+    if PIXIE_BACKEND_TARGET == "informer":
         session_id = payload.conversation_id or str(uuid4())
         informer_response = await call_informer(
             question=user_input,

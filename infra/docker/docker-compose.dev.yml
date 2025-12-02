@@ -2,9 +2,9 @@ services:
   proxy:
     image: ${CHAT_PROXY_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui-proxy:main}
     build:
-      context: ./services/chat-proxy
+      context: ../../services/chat-proxy
     container_name: chat-proxy
-    env_file: .env
+    env_file: ../../.env.dev
     ports:
       - "8010:8000"
     networks:
@@ -14,9 +14,9 @@ services:
   ui:
     image: ${CHAT_UI_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui:main}
     build:
-      context: ./services/chat-ui
+      context: ../../services/chat-ui
     container_name: chat-ui
-    env_file: .env
+    env_file: ../../.env.dev
     depends_on:
       - proxy
     ports:
