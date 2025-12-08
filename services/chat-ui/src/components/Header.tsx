@@ -15,8 +15,9 @@ export function Header({ displayName, theme, onNewConversation, disableActions =
       <div className="app-header__left">
         {logoUrl ? (
           <img src={logoUrl} alt={`${displayName} logo`} className="app-header__logo" />
-        ) : null}
-        <span className="app-header__title">{displayName}</span>
+        ) : (
+          <span className="app-header__title">{displayName}</span>
+        )}
       </div>
       {onNewConversation ? (
         <button
