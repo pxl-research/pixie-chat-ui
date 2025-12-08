@@ -41,9 +41,11 @@ export function ChatWindow({ messages, onSend, loading, error }: ChatWindowProps
               <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
                 <span className="role">{message.role === ROLE_USER ? "You" : "Pixie"}</span>
                 {message.content ? (
-                  <ReactMarkdown className="message__markdown" remarkPlugins={[remarkGfm]}>
-                    {message.content}
-                  </ReactMarkdown>
+                  <div className="message__markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 ) : null}
                 {message.rich?.type === SEARCH_RESULTS ? (
                   <SearchResultsCarousel results={message.rich.results} />
