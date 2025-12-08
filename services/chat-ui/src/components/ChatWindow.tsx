@@ -1,9 +1,11 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { FormEvent } from "react";
 
-import type { ChatMessage } from "../types";
 import { ROLE_USER, SEARCH_RESULTS } from "../constants";
+import type { ChatMessage } from "../types";
 import { SearchResultsCarousel } from "./SearchResultsCarousel";
 
 type ChatWindowProps = {
@@ -38,7 +40,11 @@ export function ChatWindow({ messages, onSend, loading, error }: ChatWindowProps
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
                 <span className="role">{message.role === ROLE_USER ? "You" : "Pixie"}</span>
-                {message.content ? <p>{message.content}</p> : null}
+                {message.content ? (
+                  <ReactMarkdown className="message__markdown" remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                ) : null}
                 {message.rich?.type === SEARCH_RESULTS ? (
                   <SearchResultsCarousel results={message.rich.results} />
                 ) : null}
