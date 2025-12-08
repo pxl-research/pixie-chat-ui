@@ -78,7 +78,7 @@ main {
   max-width: 760px;
   height: 100%;
   max-height: 100%;
-  background: #ffffff;
+  background: transparent;
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
   box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.2);
@@ -92,7 +92,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  background-color: #f3f4f6;
+  background-color: transparent;
 }
 
 .empty-state {
