@@ -6,6 +6,7 @@ import { ChatWindow } from "./components/ChatWindow";
 import { Header } from "./components/Header";
 import { type ClientConfig, fetchClientConfig } from "./config/client";
 import { useChat } from "./hooks/useChat";
+import { resolvePrimaryColor } from "./utils/theme";
 
 function App() {
   const [client, setClient] = useState<ClientConfig | null>(null);
@@ -59,8 +60,9 @@ function App() {
       }
     : {};
 
-  const themeStyle: React.CSSProperties = client.theme.primaryColor
-    ? ({ ["--primary-color"]: client.theme.primaryColor } as React.CSSProperties)
+  const primaryColor = resolvePrimaryColor(client.theme);
+  const themeStyle: React.CSSProperties = primaryColor
+    ? ({ ["--primary-color"]: primaryColor } as React.CSSProperties)
     : {};
 
   return (
