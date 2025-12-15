@@ -5,6 +5,9 @@ services:
       context: ../../services/chat-proxy
     container_name: chat-proxy
     env_file: ../../.env.dev
+    environment:
+      PIXIE_CORE_API_BASE_URL: http://recommender-api:8000
+      PIXIE_INFORMER_API_BASE_URL: http://informer-api:8000
     ports:
       - "8010:8000"
     networks:

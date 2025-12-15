@@ -10,8 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI()
 
-DEFAULT_PIXIE_CORE_API_BASE_URL = "http://recommender-api:8000"
-DEFAULT_PIXIE_INFORMER_API_BASE_URL = "http://informer-api:8000"
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
 
@@ -24,6 +22,14 @@ def _parse_origins(raw: str) -> list[str]:
     if raw.strip() == "*":
         return ["*"]
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def _get_required_url(env_name: str, default: str | None = None) -> str:
+    """Fetch and normalize a required URL env variable, with an optional default."""
+    normalized = _normalize_url(os.environ.get(env_name, default or ""))
+    if not normalized:
+        raise RuntimeError(f"{env_name} environment variable is required")
+    return normalized
 
 ALLOWED_ORIGINS = _parse_origins(DEFAULT_CORS_ALLOW_ORIGINS)
 
@@ -40,8 +46,8 @@ PIXIE_BACKEND_TARGET = (os.environ.get("PIXIE_BACKEND_TARGET") or DEFAULT_BACKEN
 if PIXIE_BACKEND_TARGET not in {"recommender", "informer"}:
     raise RuntimeError("PIXIE_BACKEND_TARGET must be either 'recommender' or 'informer'")
 
-PIXIE_CORE_API_BASE_URL: str = _normalize_url(DEFAULT_PIXIE_CORE_API_BASE_URL)
-PIXIE_INFORMER_API_BASE_URL: str = _normalize_url(DEFAULT_PIXIE_INFORMER_API_BASE_URL)
+PIXIE_CORE_API_BASE_URL: str = _get_required_url("PIXIE_CORE_API_BASE_URL", "http://recommender-api:8000")
+PIXIE_INFORMER_API_BASE_URL: str = _get_required_url("PIXIE_INFORMER_API_BASE_URL", "http://informer-api:8000")
 
 _client_id = os.environ.get("ACTIVE_CLIENT_ID")
 if not _client_id:

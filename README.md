@@ -28,7 +28,7 @@ Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer
 PIXIE_BACKEND_TARGET=informer
 ```
 
-De basis-URLs voor zowel recommender (`http://recommender-api:8000`) als informer (`http://informer-api:8000`) staan als constant in `services/chat-proxy/main.py`. Pas die in de code aan als je een andere host of poort gebruikt. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
+De basis-URLs voor zowel recommender als informer stel je via env vars in: `PIXIE_CORE_API_BASE_URL` en `PIXIE_INFORMER_API_BASE_URL` (in Docker Compose alvast ingesteld in `infra/docker/docker-compose.dev.yml`). Standaard wijzen ze naar `http://recommender-api:8000` en `http://informer-api:8000`. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
 
 ### Ontwikkelen met Docker Compose
 
