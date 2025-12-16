@@ -4,6 +4,7 @@ import "./App.css";
 
 import { ChatWindow } from "./components/ChatWindow";
 import { Header } from "./components/Header";
+import { Landing } from "./components/Landing";
 import { type ClientConfig, fetchClientConfig } from "./config/client";
 import { useChat } from "./hooks/useChat";
 import { resolvePrimaryColor } from "./utils/theme";
@@ -12,6 +13,7 @@ function App() {
   const [client, setClient] = useState<ClientConfig | null>(null);
   const [loadingClient, setLoadingClient] = useState(true);
   const [clientError, setClientError] = useState<string | null>(null);
+  const [hasEnteredChat, setHasEnteredChat] = useState(false);
 
   const { messages, loading, error, sendMessage, reset } = useChat(client?.welcomeMessage);
   const [sessionKey, setSessionKey] = useState(0);
@@ -36,6 +38,17 @@ function App() {
     reset(client?.welcomeMessage);
     setSessionKey((prev) => prev + 1);
   }, [client?.welcomeMessage, reset]);
+
+  const handleStart = useCallback(
+    async (prefill?: string) => {
+      handleNewConversation();
+      setHasEnteredChat(true);
+      if (prefill) {
+        await sendMessage(prefill);
+      }
+    },
+    [handleNewConversation, sendMessage],
+  );
 
   if (loadingClient) {
     return <div className="app app-centered">Loading chat experience...</div>;
@@ -67,15 +80,28 @@ function App() {
 
   return (
     <div className="app" style={{ ...backgroundStyle, ...themeStyle }}>
-      <Header displayName={client.displayName} theme={client.theme} onNewConversation={handleNewConversation} disableActions={loading} />
+      <Header
+        displayName={client.displayName}
+        theme={client.theme}
+        onNewConversation={hasEnteredChat ? handleNewConversation : undefined}
+        disableActions={loading}
+      />
       <main>
-        <ChatWindow
-          key={sessionKey}
-          messages={messages}
-          onSend={sendMessage}
-          loading={loading}
-          error={error}
-        />
+        {hasEnteredChat ? (
+          <ChatWindow
+            key={sessionKey}
+            messages={messages}
+            onSend={sendMessage}
+            loading={loading}
+            error={error}
+          />
+        ) : (
+          <Landing
+            client={client}
+            onStart={handleStart}
+            loading={loading}
+          />
+        )}
       </main>
     </div>
   );

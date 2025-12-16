@@ -37,3 +37,13 @@ Gebruik het env-bestand `.env.dev` in de projectroot (kopieer `.env.example` ind
 ```
 docker compose -f infra/docker/docker-compose.dev.yml up --build
 ```
+
+### Landing page copy en startkeuzes
+
+De UI toont eerst een landing page met een korte toelichting en een startknop. Je kunt de teksten en eventuele preset-knoppen via env vars aanpassen:
+
+- `LANDING_TITLE` – kop bovenaan de landing page.
+- `LANDING_RESEARCH_NOTE` – tekst over de TETRA-onderzoekcontext en experimentele antwoorden.
+- `LANDING_PRIVACY_NOTE` – tekst over privacy/GDPR en het ontbreken van persoonsgegevens.
+- `LANDING_START_LABEL` – label voor de hoofdknop (default: "Start assistent").
+- `LANDING_PRESETS` – optionele preset-knoppen, pipe-gescheiden. Formaat `Label` of `Label=prefill`. Voorbeeld: `LANDING_PRESETS=Man|Vrouw|Rode wijn=Ik zoek een rode wijn|Witte wijn=Ik zoek een frisse witte wijn`. Ontbreekt deze variabele, dan verschijnt alleen de hoofdknop.

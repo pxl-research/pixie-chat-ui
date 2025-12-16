@@ -4,11 +4,25 @@ export type ClientTheme = {
   backgroundImageUrl?: string;
 };
 
+export type LandingPreset = {
+  label: string;
+  prefill: string;
+};
+
+export type LandingConfig = {
+  title: string;
+  researchNote: string;
+  privacyNote: string;
+  startLabel: string;
+  presets: LandingPreset[];
+};
+
 export type ClientConfig = {
   id: string;
   displayName: string;
   theme: ClientTheme;
   welcomeMessage?: string;
+  landing: LandingConfig;
 };
 
 const DEFAULT_API_BASE_URL = "http://localhost:8010";

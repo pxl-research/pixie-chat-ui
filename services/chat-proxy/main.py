@@ -12,6 +12,13 @@ app = FastAPI()
 
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
+DEFAULT_LANDING_TITLE = "Welkom bij onze AI-assistent"
+DEFAULT_LANDING_RESEARCH_NOTE = (
+    "Deze AI-assistent maakt deel uit van een TETRA-onderzoeksproject. De antwoorden zijn experimenteel en kunnen onvolledig of onjuist zijn."
+)
+DEFAULT_LANDING_PRIVACY_NOTE = (
+    "We vragen of bewaren geen persoonsgegevens. Anonieme gebruiksgegevens worden verzameld om het onderzoek te verbeteren, met respect voor de GDPR-richtlijnen."
+)
 
 
 def _normalize_url(raw: str) -> str:
@@ -30,6 +37,25 @@ def _get_required_url(env_name: str, default: str | None = None) -> str:
     if not normalized:
         raise RuntimeError(f"{env_name} environment variable is required")
     return normalized
+
+
+def _parse_landing_presets(raw: str) -> list[dict[str, str]]:
+    """Parse pipe-delimited landing presets; each item can be label or label=prefill."""
+    presets: list[dict[str, str]] = []
+    for item in raw.split("|"):
+        token = item.strip()
+        if not token:
+            continue
+        if "=" in token:
+            label, prefill = token.split("=", 1)
+        else:
+            label, prefill = token, token
+        label = label.strip()
+        prefill = prefill.strip()
+        if not label:
+            continue
+        presets.append({"label": label, "prefill": prefill or label})
+    return presets
 
 ALLOWED_ORIGINS = _parse_origins(DEFAULT_CORS_ALLOW_ORIGINS)
 
@@ -82,6 +108,13 @@ def build_client_payload() -> Dict[str, Any]:
         "displayName": os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", ACTIVE_CLIENT_ID),
         "theme": theme,
         "welcomeMessage": os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE"),
+        "landing": {
+            "title": os.environ.get("LANDING_TITLE", DEFAULT_LANDING_TITLE),
+            "researchNote": os.environ.get("LANDING_RESEARCH_NOTE", DEFAULT_LANDING_RESEARCH_NOTE),
+            "privacyNote": os.environ.get("LANDING_PRIVACY_NOTE", DEFAULT_LANDING_PRIVACY_NOTE),
+            "startLabel": os.environ.get("LANDING_START_LABEL", "Start assistent"),
+            "presets": _parse_landing_presets(os.environ.get("LANDING_PRESETS", "")),
+        },
     }
 
 
