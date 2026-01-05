@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const FALLBACK_API_BASE_URL = "http://localhost:8010";
+const FALLBACK_API_BASE_URL = "/api";
 
 function resolveApiBaseUrl() {
   const candidates = [

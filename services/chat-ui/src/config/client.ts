@@ -25,7 +25,7 @@ export type ClientConfig = {
   landing: LandingConfig;
 };
 
-const FALLBACK_API_BASE_URL = "http://localhost:8010";
+const FALLBACK_API_BASE_URL = "/api";
 
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();

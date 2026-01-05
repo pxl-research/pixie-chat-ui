@@ -38,6 +38,8 @@ Gebruik het env-bestand `.env.dev` in de projectroot (kopieer `.env.example` ind
 docker compose -f infra/docker/docker-compose.dev.yml up --build
 ```
 
+De compose-file start een gateway (Caddy) op `http://localhost:3000` die UI en proxy onder dezelfde origin zet. De UI spreekt de API aan via `/api`, waardoor CORS niet nodig is zolang je via de gateway werkt. Voor mobiel/LAN volstaat het om de QR-code te richten op `http://<host-ip>:3000`.
+
 ### Landing page copy en startkeuzes
 
 De UI toont eerst een landing page met een korte toelichting en een startknop. Je kunt de teksten en eventuele preset-knoppen via env vars aanpassen:
