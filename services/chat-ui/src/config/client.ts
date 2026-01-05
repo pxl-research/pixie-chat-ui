@@ -25,7 +25,7 @@ export type ClientConfig = {
   landing: LandingConfig;
 };
 
-const DEFAULT_API_BASE_URL = "http://localhost:8010";
+const FALLBACK_API_BASE_URL = "http://localhost:8010";
 
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
@@ -35,7 +35,14 @@ function normalizeBaseUrl(value: string): string {
   return trimmed.replace(/\/$/, "");
 }
 
-export const API_BASE_URL = normalizeBaseUrl(DEFAULT_API_BASE_URL);
+function resolveApiBaseUrl(): string {
+  const runtimeBaseUrl =
+    typeof window !== "undefined" ? window.__ENV__?.API_BASE_URL?.trim() : undefined;
+  const viteBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  return normalizeBaseUrl(runtimeBaseUrl || viteBaseUrl || FALLBACK_API_BASE_URL);
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
   const response = await fetch(`${API_BASE_URL}/client`);

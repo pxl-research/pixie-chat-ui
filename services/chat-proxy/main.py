@@ -57,7 +57,8 @@ def _parse_landing_presets(raw: str) -> list[dict[str, str]]:
         presets.append({"label": label, "prefill": prefill or label})
     return presets
 
-ALLOWED_ORIGINS = _parse_origins(DEFAULT_CORS_ALLOW_ORIGINS)
+CORS_ALLOW_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", DEFAULT_CORS_ALLOW_ORIGINS)
+ALLOWED_ORIGINS = _parse_origins(CORS_ALLOW_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,

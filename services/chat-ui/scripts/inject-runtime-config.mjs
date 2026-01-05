@@ -2,14 +2,30 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const DEFAULT_API_BASE_URL = "http://localhost:8010";
+const FALLBACK_API_BASE_URL = "http://localhost:8010";
+
+function resolveApiBaseUrl() {
+  const candidates = [
+    process.env.API_BASE_URL,
+    process.env.VITE_API_BASE_URL,
+    FALLBACK_API_BASE_URL,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim().replace(/\/$/, "");
+    }
+  }
+
+  return FALLBACK_API_BASE_URL;
+}
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const distDir = join(scriptDir, "..", "dist");
   const targetPath = join(distDir, "env-config.js");
 
-  const normalizedBaseUrl = DEFAULT_API_BASE_URL.trim().replace(/\/$/, "");
+  const normalizedBaseUrl = resolveApiBaseUrl();
 
   const payload = {
     API_BASE_URL: normalizedBaseUrl,
