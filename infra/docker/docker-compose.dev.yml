@@ -21,6 +21,7 @@ services:
     environment:
       PIXIE_CORE_API_BASE_URL: http://recommender-api:8000
       PIXIE_INFORMER_API_BASE_URL: http://informer-api:8000
+      PIXIE_QUESTIONER_API_BASE_URL: http://questioner-api:8000
     networks:
       - default
       - pixie

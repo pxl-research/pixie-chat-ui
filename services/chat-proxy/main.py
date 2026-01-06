@@ -67,14 +67,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Determine target backend (recommender or informer)
+# Determine target backend (recommender, informer, questioner)
 PIXIE_BACKEND_TARGET = (os.environ.get("PIXIE_BACKEND_TARGET") or DEFAULT_BACKEND_TARGET).strip().lower()
 
-if PIXIE_BACKEND_TARGET not in {"recommender", "informer"}:
-    raise RuntimeError("PIXIE_BACKEND_TARGET must be either 'recommender' or 'informer'")
+if PIXIE_BACKEND_TARGET not in {"recommender", "informer", "questioner"}:
+    raise RuntimeError("PIXIE_BACKEND_TARGET must be either 'recommender', 'informer', or 'questioner'")
 
 PIXIE_CORE_API_BASE_URL: str = _get_required_url("PIXIE_CORE_API_BASE_URL", "http://recommender-api:8000")
 PIXIE_INFORMER_API_BASE_URL: str = _get_required_url("PIXIE_INFORMER_API_BASE_URL", "http://informer-api:8000")
+PIXIE_QUESTIONER_API_BASE_URL: str = _get_required_url("PIXIE_QUESTIONER_API_BASE_URL", "http://questioner-api:8000")
 
 _client_id = os.environ.get("ACTIVE_CLIENT_ID")
 if not _client_id:
@@ -82,7 +83,12 @@ if not _client_id:
 ACTIVE_CLIENT_ID: str = _client_id
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
-BACKEND_BASE_URL: str = PIXIE_CORE_API_BASE_URL if PIXIE_BACKEND_TARGET == "recommender" else PIXIE_INFORMER_API_BASE_URL  # type: ignore[assignment]
+BACKEND_BASE_URLS: Dict[str, str] = {
+    "recommender": PIXIE_CORE_API_BASE_URL,
+    "informer": PIXIE_INFORMER_API_BASE_URL,
+    "questioner": PIXIE_QUESTIONER_API_BASE_URL,
+}
+BACKEND_BASE_URL: str = BACKEND_BASE_URLS[PIXIE_BACKEND_TARGET]
 
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
@@ -241,8 +247,8 @@ class ChatRequest(BaseModel):
     history: List[str] | None = None
 
 
-async def call_informer(question: str, session_id: str, history: List[str] | None) -> Dict[str, Any]:
-    """Forward chat request to Pixie Informer `/ask` endpoint."""
+async def call_qa_backend(question: str, session_id: str, history: List[str] | None) -> Dict[str, Any]:
+    """Forward chat request to the QA backend `/ask` endpoint."""
     payload = {
         "question": question,
         "session_id": session_id,
@@ -263,7 +269,7 @@ async def call_informer(question: str, session_id: str, history: List[str] | Non
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(
-            status_code=502, detail=f"Error reaching Pixie Informer: {exc}"
+            status_code=502, detail=f"Error reaching Pixie {PIXIE_BACKEND_TARGET}: {exc}"
         ) from exc
 
     try:
@@ -281,6 +287,21 @@ async def call_informer(question: str, session_id: str, history: List[str] | Non
     return data
 
 
+def build_qa_response(data: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+    """Normalize QA backend responses to the UI format."""
+    text = data.get("text")
+    if text is None:
+        text = data.get("answer")
+
+    return {
+        "type": data.get("type") or "answer",
+        "text": text,
+        "prompt": data.get("prompt"),
+        "reason": data.get("reason"),
+        "conversationId": data.get("conversation_id") or data.get("conversationId") or session_id,
+    }
+
+
 @app.post("/chat")
 async def chat(payload: ChatRequest) -> Dict[str, Any]:
     """Forward chat request to the configured Pixie backend for the active client."""
@@ -290,18 +311,14 @@ async def chat(payload: ChatRequest) -> Dict[str, Any]:
 
     await ensure_backend_ready()
 
-    if PIXIE_BACKEND_TARGET == "informer":
+    if PIXIE_BACKEND_TARGET in {"informer", "questioner"}:
         session_id = payload.conversation_id or str(uuid4())
-        informer_response = await call_informer(
+        qa_response = await call_qa_backend(
             question=user_input,
             session_id=session_id,
             history=payload.history,
         )
-        return {
-            "type": "answer",
-            "text": informer_response.get("answer"),
-            "conversationId": session_id,
-        }
+        return build_qa_response(qa_response, session_id)
 
     if payload.conversation_id:
         pixie_payload = {"conversation_id": payload.conversation_id, "message": user_input}

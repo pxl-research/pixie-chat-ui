@@ -20,15 +20,16 @@ Zo vormt deze repository de zichtbare voorkant van een groter geheel: gebruikers
 
 Je configureert de chat volledig via omgevingsvariabelen: kies de klant, stel kleur en logo in, voeg een welkomstboodschap toe en start de services. Daarna is de chat onmiddellijk beschikbaar en integreert hij vanzelf met de andere PiXie-componenten binnen je omgeving.
 
-### Routeren tussen recommender en informer
+### Routeren tussen recommender, informer en questioner
 
-Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer aanspreken, zet dan in `.env.dev`:
+Standaard stuurt de chat-proxy naar de recommender. Wil je tijdelijk de informer of questioner aanspreken, zet dan in `.env.dev`:
 
 ```
 PIXIE_BACKEND_TARGET=informer
+PIXIE_BACKEND_TARGET=questioner
 ```
 
-De basis-URLs voor zowel recommender als informer stel je via env vars in: `PIXIE_CORE_API_BASE_URL` en `PIXIE_INFORMER_API_BASE_URL` (in Docker Compose alvast ingesteld in `infra/docker/docker-compose.dev.yml`). Standaard wijzen ze naar `http://recommender-api:8000` en `http://informer-api:8000`. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
+De basis-URLs voor recommender, informer en questioner stel je via env vars in: `PIXIE_CORE_API_BASE_URL`, `PIXIE_INFORMER_API_BASE_URL` en `PIXIE_QUESTIONER_API_BASE_URL` (in Docker Compose alvast ingesteld in `infra/docker/docker-compose.dev.yml`). Standaard wijzen ze naar `http://recommender-api:8000`, `http://informer-api:8000` en `http://questioner-api:8000`. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
 
 ### Ontwikkelen met Docker Compose
 
