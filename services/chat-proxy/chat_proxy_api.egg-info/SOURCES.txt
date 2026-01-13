@@ -1,0 +1,8 @@
+bootstrap.py
+main.py
+pyproject.toml
+chat_proxy_api.egg-info/PKG-INFO
+chat_proxy_api.egg-info/SOURCES.txt
+chat_proxy_api.egg-info/dependency_links.txt
+chat_proxy_api.egg-info/requires.txt
+chat_proxy_api.egg-info/top_level.txt
