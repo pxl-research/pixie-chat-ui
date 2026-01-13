@@ -73,7 +73,12 @@ export function useChat(initialAssistantMessage?: string) {
         if (hasAssistantMessage) {
           setMessages((prev) => [
             ...prev,
-            { role: ROLE_ASSISTANT, content: assistantContent, rich: parsed.richContent },
+            {
+              role: ROLE_ASSISTANT,
+              content: assistantContent,
+              rich: parsed.richContent,
+              variant: parsed.messageVariant,
+            },
           ]);
         }
       } catch (err) {

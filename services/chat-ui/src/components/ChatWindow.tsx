@@ -100,8 +100,17 @@ export function ChatWindow({
           ) : (
             <>
               {messages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                  <span className="role">{message.role === ROLE_USER ? "You" : headerTitle}</span>
+                <div
+                  key={`${message.role}-${index}`}
+                  className={`message ${message.role}${message.variant ? ` ${message.variant}` : ""}`}
+                >
+                  <span className="role">
+                    {message.role === ROLE_USER
+                      ? "You"
+                      : message.variant === "summary"
+                        ? "Samenvatting"
+                        : headerTitle}
+                  </span>
                   {message.content ? (
                     <div className="message__markdown">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>

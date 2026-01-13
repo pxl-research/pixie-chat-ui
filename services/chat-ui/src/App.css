@@ -20,7 +20,7 @@
 /* Header styles using a CSS variable for primary color */
 .app-header {
   background-color: var(--primary-color, #1f2937);
-  color: #ffffff;
+  color: var(--on-primary, #ffffff);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -135,7 +135,7 @@ main {
 .landing__start {
   align-self: flex-start;
   background-color: var(--primary-color, #1f2937);
-  color: #ffffff;
+  color: var(--on-primary, #ffffff);
   border: none;
   border-radius: 9999px;
   padding: 0.85rem 1.4rem;
@@ -264,7 +264,7 @@ main {
   border: none;
   border-radius: 9999px;
   background-color: var(--primary-color, #1f2937);
-  color: #ffffff;
+  color: var(--on-primary, #ffffff);
   padding: 0.45rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
@@ -376,6 +376,51 @@ main {
   border: 1px solid #e5e7eb;
 }
 
+.message.assistant.summary {
+  background-color: var(--primary-color, #1f2937);
+  color: var(--on-primary, #ffffff);
+  border: none;
+}
+
+.message.assistant.summary .role {
+  color: var(--on-primary, #ffffff);
+  opacity: 0.85;
+}
+
+.message.assistant.summary .message__markdown a {
+  color: inherit;
+  text-decoration-color: currentColor;
+}
+
+.message.assistant.summary .message__markdown blockquote {
+  color: inherit;
+  border-left-color: rgba(255, 255, 255, 0.45);
+}
+
+.message.assistant.summary .message__markdown code {
+  color: inherit;
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.message.assistant.summary .message__markdown pre {
+  color: inherit;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+@supports (color: color-mix(in srgb, #000 0%, #fff 100%)) {
+  .message.assistant.summary .message__markdown blockquote {
+    border-left-color: color-mix(in srgb, var(--on-primary, #ffffff) 45%, transparent);
+  }
+
+  .message.assistant.summary .message__markdown code {
+    background-color: color-mix(in srgb, var(--on-primary, #ffffff) 22%, transparent);
+  }
+
+  .message.assistant.summary .message__markdown pre {
+    background-color: color-mix(in srgb, var(--on-primary, #ffffff) 18%, transparent);
+  }
+}
+
 .message .role {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -439,7 +484,6 @@ main {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 0.75rem;
-  color: #ffffff;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s ease;
@@ -452,6 +496,7 @@ main {
 
 .composer__send {
   background-color: var(--primary-color, #1f2937);
+  color: var(--on-primary, #ffffff);
 }
 
 @media (max-width: 640px) {
@@ -585,8 +630,8 @@ main {
 
 .results-carousel__controls button {
   border: none;
-  background-color: #1f2937;
-  color: white;
+  background-color: var(--primary-color, #1f2937);
+  color: var(--on-primary, #ffffff);
   padding: 0.5rem 1.25rem;
   border-radius: 9999px;
   font-weight: 600;
@@ -614,7 +659,7 @@ main {
 }
 
 .results-carousel__controls .indicator.active {
-  background-color: #1f2937;
+  background-color: var(--primary-color, #1f2937);
 }
 
 @media (max-width: 640px) {

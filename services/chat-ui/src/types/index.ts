@@ -2,10 +2,13 @@ import type { Role } from "../constants";
 
 export type ChatRole = Role;
 
+export type MessageVariant = "summary";
+
 export type ChatMessage = {
   role: ChatRole;
   content: string;
   rich?: AssistantRichContent | null;
+  variant?: MessageVariant;
 };
 
 export type SearchResultAttribute = {

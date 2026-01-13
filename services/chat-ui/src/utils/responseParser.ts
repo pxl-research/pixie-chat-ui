@@ -3,17 +3,20 @@ import type { SearchResultsResponse, AssistantRichContent } from "../types";
 import {
   RESPONSE_ASK_USER,
   RESPONSE_ANSWER,
+  RESPONSE_SUMMARY,
   RESPONSE_NO_RESULTS,
   RESPONSE_NOT_RELEVANT,
   RESPONSE_ERROR,
   SEARCH_RESULTS,
 } from "../constants";
+import type { MessageVariant } from "../types";
 
 export type ParsedResponse = {
   content: string | null;
   richContent: AssistantRichContent | null;
   conversationId: string | null;
   shouldContinueConversation: boolean;
+  messageVariant?: MessageVariant;
   error?: string;
 };
 
@@ -28,6 +31,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
   let shouldContinueConversation = hasConversationId;
+  let messageVariant: MessageVariant | undefined;
   let error: string | undefined;
 
   switch (responseType) {
@@ -35,6 +39,11 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       // Backend is asking a follow-up question
       content = data?.prompt ?? "Kun je wat meer details delen?";
       shouldContinueConversation = true;
+      break;
+
+  case RESPONSE_SUMMARY:
+      content = data?.text ?? "Geen antwoord beschikbaar.";
+      messageVariant = "summary";
       break;
 
   case RESPONSE_ANSWER:
@@ -77,6 +86,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     richContent,
     conversationId: shouldContinueConversation ? conversationId : null,
     shouldContinueConversation,
+    messageVariant,
     error,
   };
 }

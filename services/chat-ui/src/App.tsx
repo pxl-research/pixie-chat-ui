@@ -7,7 +7,7 @@ import { Header } from "./components/Header";
 import { Landing } from "./components/Landing";
 import { type ClientConfig, fetchClientConfig } from "./config/client";
 import { useChat } from "./hooks/useChat";
-import { resolvePrimaryColor } from "./utils/theme";
+import { resolveOnPrimaryColor, resolvePrimaryColor } from "./utils/theme";
 
 function App() {
   const [client, setClient] = useState<ClientConfig | null>(null);
@@ -74,9 +74,11 @@ function App() {
     : {};
 
   const primaryColor = resolvePrimaryColor(client.theme);
-  const themeStyle: React.CSSProperties = primaryColor
-    ? ({ ["--primary-color"]: primaryColor } as React.CSSProperties)
-    : {};
+  const onPrimaryColor = resolveOnPrimaryColor(primaryColor);
+  const themeStyle: React.CSSProperties = {
+    ...(primaryColor ? { ["--primary-color"]: primaryColor } : {}),
+    ...(onPrimaryColor ? { ["--on-primary"]: onPrimaryColor } : {}),
+  };
   const chatHeaderTitle =
     client.chatHeader?.title?.trim() || `${client.displayName} Assistant`;
   const chatHeaderLogoUrl = client.chatHeader?.logoUrl?.trim() || client.theme.logoUrl;
