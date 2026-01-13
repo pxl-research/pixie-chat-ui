@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -26,6 +26,46 @@ export function ChatWindow({
   error,
 }: ChatWindowProps) {
   const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
+  useEffect(() => {
+    if (!loading) {
+      inputRef.current?.focus();
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (!autoScrollEnabled) {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length, loading, autoScrollEnabled]);
+
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+    const threshold = 24;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isAtBottom = distanceFromBottom <= threshold;
+    setAutoScrollEnabled((prev) => (prev === isAtBottom ? prev : isAtBottom));
+  };
+
+  const handleScrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    setAutoScrollEnabled(true);
+    inputRef.current?.focus();
+  };
+
+  const showScrollToBottom = !autoScrollEnabled && messages.length > 0;
 
   // theme primary color is applied at the app root as CSS variable --primary-color
 
@@ -47,42 +87,56 @@ export function ChatWindow({
         ) : null}
         <span className="chat-header__title">{headerTitle}</span>
       </header>
-      <div className="messages" role="log" aria-live="polite">
-        {messages.length === 0 ? (
-          <div className="empty-state">Start the conversation by saying hello.</div>
-        ) : (
-          <>
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                <span className="role">{message.role === ROLE_USER ? "You" : headerTitle}</span>
-                {message.content ? (
-                  <div className="message__markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : null}
-                {message.rich?.type === SEARCH_RESULTS ? (
-                  <SearchResultsCarousel results={message.rich.results} />
-                ) : null}
-              </div>
-            ))}
-            {loading ? (
-              <div className="message assistant typing">
-                <span className="role">{headerTitle}</span>
-                <div
-                  className="typing-indicator"
-                  aria-label={`${headerTitle} is typing`}
-                  role="status"
-                >
-                  <span />
-                  <span />
-                  <span />
+      <div className="messages-wrapper">
+        <div
+          className="messages"
+          role="log"
+          aria-live="polite"
+          ref={messagesContainerRef}
+          onScroll={handleMessagesScroll}
+        >
+          {messages.length === 0 ? (
+            <div className="empty-state">Start the conversation by saying hello.</div>
+          ) : (
+            <>
+              {messages.map((message, index) => (
+                <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
+                  <span className="role">{message.role === ROLE_USER ? "You" : headerTitle}</span>
+                  {message.content ? (
+                    <div className="message__markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : null}
+                  {message.rich?.type === SEARCH_RESULTS ? (
+                    <SearchResultsCarousel results={message.rich.results} />
+                  ) : null}
                 </div>
-              </div>
-            ) : null}
-          </>
-        )}
+              ))}
+              {loading ? (
+                <div className="message assistant typing">
+                  <span className="role">{headerTitle}</span>
+                  <div
+                    className="typing-indicator"
+                    aria-label={`${headerTitle} is typing`}
+                    role="status"
+                  >
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        {showScrollToBottom ? (
+          <button type="button" className="scroll-to-bottom" onClick={handleScrollToBottom}>
+            Naar beneden
+          </button>
+        ) : null}
       </div>
 
       {error ? (
@@ -93,6 +147,8 @@ export function ChatWindow({
 
       <form className="composer" onSubmit={handleSubmit}>
         <input
+          ref={inputRef}
+          autoFocus
           type="text"
           placeholder={loading ? "Waiting for response..." : "Type your message"}
           value={draft}
