@@ -115,6 +115,9 @@ def build_client_payload() -> Dict[str, Any]:
         chat_header["title"] = chat_header_title
     if chat_header_logo_url := os.environ.get("ACTIVE_CLIENT_CHAT_HEADER_LOGO_URL"):
         chat_header["logoUrl"] = chat_header_logo_url
+    if "logoUrl" not in chat_header:
+        if logo_no_text_url := os.environ.get("ACTIVE_CLIENT_LOGO_NO_TEXT_URL"):
+            chat_header["logoUrl"] = logo_no_text_url
 
     payload = {
         "id": ACTIVE_CLIENT_ID,
