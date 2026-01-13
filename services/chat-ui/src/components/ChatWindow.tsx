@@ -54,7 +54,7 @@ export function ChatWindow({
           <>
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                <span className="role">{message.role === ROLE_USER ? "You" : "Pixie"}</span>
+                <span className="role">{message.role === ROLE_USER ? "You" : headerTitle}</span>
                 {message.content ? (
                   <div className="message__markdown">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -69,8 +69,12 @@ export function ChatWindow({
             ))}
             {loading ? (
               <div className="message assistant typing">
-                <span className="role">Pixie</span>
-                <div className="typing-indicator" aria-label="Pixie is typing" role="status">
+                <span className="role">{headerTitle}</span>
+                <div
+                  className="typing-indicator"
+                  aria-label={`${headerTitle} is typing`}
+                  role="status"
+                >
                   <span />
                   <span />
                   <span />
