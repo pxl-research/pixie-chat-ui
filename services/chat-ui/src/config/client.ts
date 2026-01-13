@@ -4,6 +4,11 @@ export type ClientTheme = {
   backgroundImageUrl?: string;
 };
 
+export type ChatHeaderConfig = {
+  title?: string;
+  logoUrl?: string;
+};
+
 export type LandingPreset = {
   label: string;
   prefill: string;
@@ -21,6 +26,7 @@ export type ClientConfig = {
   id: string;
   displayName: string;
   theme: ClientTheme;
+  chatHeader?: ChatHeaderConfig;
   welcomeMessage?: string;
   landing: LandingConfig;
 };

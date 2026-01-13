@@ -10,12 +10,21 @@ import { SearchResultsCarousel } from "./SearchResultsCarousel";
 
 type ChatWindowProps = {
   messages: ChatMessage[];
+  headerTitle: string;
+  headerLogoUrl?: string;
   onSend: (content: string) => Promise<void> | void;
   loading: boolean;
   error: string | null;
 };
 
-export function ChatWindow({ messages, onSend, loading, error }: ChatWindowProps) {
+export function ChatWindow({
+  messages,
+  headerTitle,
+  headerLogoUrl,
+  onSend,
+  loading,
+  error,
+}: ChatWindowProps) {
   const [draft, setDraft] = useState("");
 
   // theme primary color is applied at the app root as CSS variable --primary-color
@@ -32,6 +41,12 @@ export function ChatWindow({ messages, onSend, loading, error }: ChatWindowProps
 
   return (
     <div className="chat-window">
+      <header className="chat-header">
+        {headerLogoUrl ? (
+          <img src={headerLogoUrl} alt={`${headerTitle} logo`} className="chat-header__logo" />
+        ) : null}
+        <span className="chat-header__title">{headerTitle}</span>
+      </header>
       <div className="messages" role="log" aria-live="polite">
         {messages.length === 0 ? (
           <div className="empty-state">Start the conversation by saying hello.</div>

@@ -101,6 +101,7 @@ _http_client: Optional[httpx.AsyncClient] = None
 def build_client_payload() -> Dict[str, Any]:
     """Build client configuration from environment variables."""
     theme: Dict[str, str] = {}
+    chat_header: Dict[str, str] = {}
 
     # Add theme properties if defined
     if primary_color := os.environ.get("ACTIVE_CLIENT_PRIMARY_COLOR"):
@@ -110,7 +111,12 @@ def build_client_payload() -> Dict[str, Any]:
     if bg_image := os.environ.get("ACTIVE_CLIENT_BACKGROUND_IMAGE_URL"):
         theme["backgroundImageUrl"] = bg_image
 
-    return {
+    if chat_header_title := os.environ.get("ACTIVE_CLIENT_CHAT_HEADER_TITLE"):
+        chat_header["title"] = chat_header_title
+    if chat_header_logo_url := os.environ.get("ACTIVE_CLIENT_CHAT_HEADER_LOGO_URL"):
+        chat_header["logoUrl"] = chat_header_logo_url
+
+    payload = {
         "id": ACTIVE_CLIENT_ID,
         "displayName": os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", ACTIVE_CLIENT_ID),
         "theme": theme,
@@ -123,6 +129,11 @@ def build_client_payload() -> Dict[str, Any]:
             "presets": _parse_landing_presets(os.environ.get("LANDING_PRESETS", "")),
         },
     }
+
+    if chat_header:
+        payload["chatHeader"] = chat_header
+
+    return payload
 
 
 @app.get("/client")

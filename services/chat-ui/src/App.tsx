@@ -77,6 +77,9 @@ function App() {
   const themeStyle: React.CSSProperties = primaryColor
     ? ({ ["--primary-color"]: primaryColor } as React.CSSProperties)
     : {};
+  const chatHeaderTitle =
+    client.chatHeader?.title?.trim() || `${client.displayName} Assistant`;
+  const chatHeaderLogoUrl = client.chatHeader?.logoUrl?.trim() || client.theme.logoUrl;
 
   return (
     <div className="app" style={{ ...backgroundStyle, ...themeStyle }}>
@@ -91,6 +94,8 @@ function App() {
           <ChatWindow
             key={sessionKey}
             messages={messages}
+            headerTitle={chatHeaderTitle}
+            headerLogoUrl={chatHeaderLogoUrl}
             onSend={sendMessage}
             loading={loading}
             error={error}
