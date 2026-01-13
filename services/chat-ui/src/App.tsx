@@ -75,10 +75,10 @@ function App() {
 
   const primaryColor = resolvePrimaryColor(client.theme);
   const onPrimaryColor = resolveOnPrimaryColor(primaryColor);
-  const themeStyle: React.CSSProperties = {
+  const themeStyle = {
     ...(primaryColor ? { ["--primary-color"]: primaryColor } : {}),
     ...(onPrimaryColor ? { ["--on-primary"]: onPrimaryColor } : {}),
-  };
+  } as React.CSSProperties;
   const chatHeaderTitle =
     client.chatHeader?.title?.trim() || `${client.displayName} Assistant`;
   const chatHeaderLogoUrl = client.chatHeader?.logoUrl?.trim() || client.theme.logoUrl;
