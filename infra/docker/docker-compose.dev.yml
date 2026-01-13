@@ -17,33 +17,19 @@ services:
     build:
       context: ../../services/chat-proxy
     container_name: chat-proxy
-    depends_on:
-      - audit-db
     env_file: ../../.env.dev
     environment:
       PIXIE_CORE_API_BASE_URL: http://recommender-api:8000
       PIXIE_INFORMER_API_BASE_URL: http://informer-api:8000
       PIXIE_QUESTIONER_API_BASE_URL: http://questioner-api:8000
       AUDIT_LOGGING_ENABLED: ${AUDIT_LOGGING_ENABLED:-true}
-      AUDIT_DB_URL: ${AUDIT_DB_URL:-postgres://audit:audit@audit-db:5432/audit}
+      AUDIT_API_URL: ${AUDIT_API_URL:-http://audit-api:8000}
+      AUDIT_API_KEY: ${AUDIT_API_KEY:-}
       AUDIT_LOG_TIMEOUT_MS: ${AUDIT_LOG_TIMEOUT_MS:-250}
       PIXIE_PROFILE: ${PIXIE_PROFILE:-informer}
     networks:
       - default
       - pixie
-
-  audit-db:
-    image: postgres:18-alpine
-    container_name: audit-db
-    environment:
-      POSTGRES_DB: audit
-      POSTGRES_USER: audit
-      POSTGRES_PASSWORD: audit
-    volumes:
-      - audit-db-data:/var/lib/postgresql/data
-      - ./audit-db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
-    networks:
-      - default
 
   ui:
     image: ${CHAT_UI_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui:main}
@@ -61,6 +47,3 @@ networks:
   pixie:
     external: true
     name: pixie-network
-
-volumes:
-  audit-db-data:

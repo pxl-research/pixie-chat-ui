@@ -7,7 +7,6 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-import asyncpg
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -230,9 +229,9 @@ async def audit_middleware(request: Request, call_next):
 
     metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
 
-    if _audit_pool is not None:
+    if _audit_client is not None:
         asyncio.create_task(
-            _log_to_db(
+            _send_audit_event(
                 conversation_id=conversation_id,
                 profile=PIXIE_PROFILE,
                 user_text=user_text,
@@ -269,15 +268,9 @@ BACKEND_BASE_URL: str = BACKEND_BASE_URLS[PIXIE_BACKEND_TARGET]
 PIXIE_PROFILE = (os.environ.get("PIXIE_PROFILE") or PIXIE_BACKEND_TARGET).strip().lower()
 
 AUDIT_LOGGING_ENABLED = _parse_bool(os.environ.get("AUDIT_LOGGING_ENABLED", "false"))
-AUDIT_DB_URL = os.environ.get("AUDIT_DB_URL", "").strip()
+AUDIT_API_URL = _normalize_url(os.environ.get("AUDIT_API_URL", ""))
+AUDIT_API_KEY = os.environ.get("AUDIT_API_KEY", "").strip()
 AUDIT_LOG_TIMEOUT_MS = max(0, _get_int_env("AUDIT_LOG_TIMEOUT_MS", 250))
-
-AUDIT_INSERT_CONVERSATION = (
-    "insert into audit.conversations (id, profile, metadata) values ($1, $2, $3) "
-    "on conflict (id) do nothing"
-)
-AUDIT_INSERT_MESSAGE = "insert into audit.messages (id, conversation_id, role, content, metadata) values ($1, $2, $3, $4, $5)"
-AUDIT_INSERT_SUMMARY = "insert into audit.summaries (id, conversation_id, content, metadata) values ($1, $2, $3, $4)"
 
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
@@ -285,7 +278,7 @@ HEALTH_CACHE_SECONDS = 15
 BackendHealth = Dict[str, Optional[Any]]
 _backend_health: BackendHealth = {"status": "unknown", "detail": None, "checked_at": None}
 _http_client: Optional[httpx.AsyncClient] = None
-_audit_pool: Optional[asyncpg.Pool] = None
+_audit_client: Optional[httpx.AsyncClient] = None
 
 
 def build_client_payload() -> Dict[str, Any]:
@@ -339,7 +332,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _log_to_db(
+async def _send_audit_event(
     *,
     conversation_id: str,
     profile: str,
@@ -348,77 +341,41 @@ async def _log_to_db(
     summary_text: Optional[str],
     metadata: Dict[str, Any],
 ) -> None:
-    if _audit_pool is None:
+    if _audit_client is None:
         return
+    messages: list[dict[str, Any]] = []
+    if user_text is not None:
+        messages.append({"role": "user", "content": user_text, "metadata": metadata})
+    if assistant_text is not None:
+        messages.append({"role": "assistant", "content": assistant_text, "metadata": metadata})
+
+    if not messages and summary_text is None:
+        return
+
+    payload: Dict[str, Any] = {
+        "conversation_id": conversation_id,
+        "profile": profile,
+        "metadata": metadata,
+    }
+    if messages:
+        payload["messages"] = messages
+    if summary_text is not None:
+        payload["summary"] = summary_text
+
+    headers = {"Content-Type": "application/json"}
+    if AUDIT_API_KEY:
+        headers["X-API-Key"] = AUDIT_API_KEY
+
     timeout = AUDIT_LOG_TIMEOUT_MS / 1000.0 if AUDIT_LOG_TIMEOUT_MS else None
     try:
-        if timeout:
-            await asyncio.wait_for(
-                _log_to_db_inner(
-                    conversation_id=conversation_id,
-                    profile=profile,
-                    user_text=user_text,
-                    assistant_text=assistant_text,
-                    summary_text=summary_text,
-                    metadata=metadata,
-                ),
-                timeout=timeout,
+        response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
+        if response.status_code >= 400:
+            logger.warning(
+                "Audit API rejected event",
+                extra={"conversation_id": conversation_id, "status_code": response.status_code},
             )
-        else:
-            await _log_to_db_inner(
-                conversation_id=conversation_id,
-                profile=profile,
-                user_text=user_text,
-                assistant_text=assistant_text,
-                summary_text=summary_text,
-                metadata=metadata,
-            )
-    except asyncio.TimeoutError:
-        logger.warning("Audit logging timed out", extra={"conversation_id": conversation_id})
-    except Exception:
-        logger.exception("Audit logging failed", extra={"conversation_id": conversation_id})
-
-
-async def _log_to_db_inner(
-    *,
-    conversation_id: str,
-    profile: str,
-    user_text: Optional[str],
-    assistant_text: Optional[str],
-    summary_text: Optional[str],
-    metadata: Dict[str, Any],
-) -> None:
-    if _audit_pool is None:
-        return
-    async with _audit_pool.acquire() as conn:
-        async with conn.transaction():
-            await conn.execute(AUDIT_INSERT_CONVERSATION, conversation_id, profile, metadata)
-            if user_text is not None:
-                await conn.execute(
-                    AUDIT_INSERT_MESSAGE,
-                    str(uuid4()),
-                    conversation_id,
-                    "user",
-                    user_text,
-                    metadata,
-                )
-            if assistant_text is not None:
-                await conn.execute(
-                    AUDIT_INSERT_MESSAGE,
-                    str(uuid4()),
-                    conversation_id,
-                    "assistant",
-                    assistant_text,
-                    metadata,
-                )
-            if summary_text is not None:
-                await conn.execute(
-                    AUDIT_INSERT_SUMMARY,
-                    str(uuid4()),
-                    conversation_id,
-                    summary_text,
-                    metadata,
-                )
+    except httpx.HTTPError:
+        logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
 
 
 async def get_http_client() -> httpx.AsyncClient:
@@ -464,30 +421,30 @@ async def ensure_backend_ready() -> None:
 
 @app.on_event("startup")
 async def startup_check() -> None:
-    global _audit_pool, _http_client
+    global _audit_client, _http_client
     _http_client = httpx.AsyncClient(base_url=BACKEND_BASE_URL, timeout=30.0)
     await refresh_backend_health(force=True)
-    if AUDIT_LOGGING_ENABLED and AUDIT_DB_URL:
+    if AUDIT_LOGGING_ENABLED and AUDIT_API_URL:
         try:
-            _audit_pool = await asyncpg.create_pool(dsn=AUDIT_DB_URL, min_size=1, max_size=5)
+            _audit_client = httpx.AsyncClient(base_url=AUDIT_API_URL)
         except Exception:
-            logger.exception("Failed to initialize audit logging pool")
-            _audit_pool = None
+            logger.exception("Failed to initialize audit logging client")
+            _audit_client = None
     elif AUDIT_LOGGING_ENABLED:
         logger.warning(
-            "AUDIT_LOGGING_ENABLED is true but AUDIT_DB_URL is not set; audit logging disabled."
+            "AUDIT_LOGGING_ENABLED is true but AUDIT_API_URL is not set; audit logging disabled."
         )
 
 
 @app.on_event("shutdown")
 async def shutdown_client() -> None:
-    global _audit_pool, _http_client
+    global _audit_client, _http_client
     if _http_client is not None:
         await _http_client.aclose()
         _http_client = None
-    if _audit_pool is not None:
-        await _audit_pool.close()
-        _audit_pool = None
+    if _audit_client is not None:
+        await _audit_client.aclose()
+        _audit_client = None
 
 
 @app.get("/health")
