@@ -229,17 +229,16 @@ async def audit_middleware(request: Request, call_next):
 
     metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
 
-    if _audit_client is not None:
-        asyncio.create_task(
-            _send_audit_event(
-                conversation_id=conversation_id,
-                profile=PIXIE_PROFILE,
-                user_text=user_text,
-                assistant_text=assistant_text,
-                summary_text=summary_text,
-                metadata=metadata,
-            )
-        )
+    payloads = _build_audit_payloads(
+        conversation_id=conversation_id,
+        profile=PIXIE_PROFILE,
+        user_text=user_text,
+        assistant_text=assistant_text,
+        summary_text=summary_text,
+        metadata=metadata,
+    )
+    if _audit_client is not None and payloads:
+        asyncio.create_task(_send_audit_payloads(payloads, conversation_id=conversation_id))
     return response
 
 # Determine target backend (recommender, informer, questioner)
@@ -332,7 +331,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _send_audit_event(
+def _build_audit_payloads(
     *,
     conversation_id: str,
     profile: str,
@@ -340,42 +339,66 @@ async def _send_audit_event(
     assistant_text: Optional[str],
     summary_text: Optional[str],
     metadata: Dict[str, Any],
-) -> None:
-    if _audit_client is None:
-        return
-    messages: list[dict[str, Any]] = []
-    if user_text is not None:
-        messages.append({"role": "user", "content": user_text, "metadata": metadata})
-    if assistant_text is not None:
-        messages.append({"role": "assistant", "content": assistant_text, "metadata": metadata})
-
-    if not messages and summary_text is None:
-        return
-
-    payload: Dict[str, Any] = {
+) -> list[Dict[str, Any]]:
+    payloads: list[Dict[str, Any]] = []
+    base: Dict[str, Any] = {
         "conversation_id": conversation_id,
         "profile": profile,
         "metadata": metadata,
     }
-    if messages:
-        payload["messages"] = messages
+    if user_text is not None:
+        payloads.append(
+            {
+                **base,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": user_text,
+                        "metadata": metadata,
+                    }
+                ],
+            }
+        )
+    if assistant_text is not None:
+        payloads.append(
+            {
+                **base,
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": assistant_text,
+                        "metadata": metadata,
+                    }
+                ],
+            }
+        )
     if summary_text is not None:
-        payload["summary"] = summary_text
+        payloads.append({**base, "summary": summary_text})
+    return payloads
 
+
+async def _send_audit_payloads(
+    payloads: list[Dict[str, Any]],
+    *,
+    conversation_id: str,
+) -> None:
+    if _audit_client is None or not payloads:
+        return
     headers = {"Content-Type": "application/json"}
     if AUDIT_API_KEY:
         headers["X-API-Key"] = AUDIT_API_KEY
-
     timeout = AUDIT_LOG_TIMEOUT_MS / 1000.0 if AUDIT_LOG_TIMEOUT_MS else None
-    try:
-        response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
-        if response.status_code >= 400:
-            logger.warning(
-                "Audit API rejected event",
-                extra={"conversation_id": conversation_id, "status_code": response.status_code},
-            )
-    except httpx.HTTPError:
-        logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
+
+    for payload in payloads:
+        try:
+            response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
+            if response.status_code >= 400:
+                logger.warning(
+                    "Audit API rejected event",
+                    extra={"conversation_id": conversation_id, "status_code": response.status_code},
+                )
+        except httpx.HTTPError:
+            logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
 
 
 async def get_http_client() -> httpx.AsyncClient:
