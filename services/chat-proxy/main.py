@@ -498,7 +498,7 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     client = await get_http_client()
     try:
-        response = await client.post("/ask", json=payload, headers=headers)
+        response = await client.post("/chat", json=payload, headers=headers)
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         try:
@@ -545,7 +545,7 @@ async def call_qa_backend(
     state: Dict[str, Any],
     history: List[str] | None,
 ) -> Dict[str, Any]:
-    """Forward chat request to the QA backend `/ask` endpoint."""
+    """Forward chat request to the QA backend `/chat` endpoint."""
     payload = {
         "session_id": session_id,
         "current_answer": current_answer,
@@ -557,7 +557,7 @@ async def call_qa_backend(
 
     client = await get_http_client()
     try:
-        response = await client.post("/ask", json=payload)
+        response = await client.post("/chat", json=payload)
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         try:
