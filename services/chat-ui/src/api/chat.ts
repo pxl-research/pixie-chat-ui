@@ -1,17 +1,17 @@
 import { API_BASE_URL } from "../config/client";
 
 export type ChatApiRequest = {
-  input: string;
-  conversationId?: string | null;
-  history?: string[];
+  currentAnswer: string;
+  sessionId?: string | null;
+  state: Record<string, unknown>;
 };
 
 export type ChatApiResponse = {
   type?: string;
   text?: string | null;
-  prompt?: string | null;
-  reason?: string | null;
+  conversation_id?: string | null;
   conversationId?: string | null;
+  state?: Record<string, unknown> | null;
 };
 
 /**
@@ -19,15 +19,11 @@ export type ChatApiResponse = {
  * @throws Error if the request fails or returns a non-OK status
  */
 export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiResponse> {
-  const payload: Record<string, unknown> = { input: request.input };
-
-  if (request.conversationId) {
-    payload.conversationId = request.conversationId;
-  }
-
-  if (request.history) {
-    payload.history = request.history;
-  }
+  const payload: Record<string, unknown> = {
+    current_answer: request.currentAnswer,
+    session_id: request.sessionId,
+    state: request.state,
+  };
 
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",

@@ -15,6 +15,7 @@ type ChatWindowProps = {
   onSend: (content: string) => Promise<void> | void;
   loading: boolean;
   error: string | null;
+  isComplete?: boolean;
 };
 
 export function ChatWindow({
@@ -24,6 +25,7 @@ export function ChatWindow({
   onSend,
   loading,
   error,
+  isComplete = false,
 }: ChatWindowProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -71,6 +73,9 @@ export function ChatWindow({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isComplete) {
+      return;
+    }
     const content = draft.trim();
     if (!content) {
       return;
@@ -159,12 +164,22 @@ export function ChatWindow({
           ref={inputRef}
           autoFocus
           type="text"
-          placeholder={loading ? "Waiting for response..." : "Type your message"}
+          placeholder={
+            isComplete
+              ? "Gesprek afgerond."
+              : loading
+                ? "Waiting for response..."
+                : "Type your message"
+          }
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          disabled={loading}
+          disabled={loading || isComplete}
         />
-        <button type="submit" className="composer__send" disabled={loading || draft.trim().length === 0}>
+        <button
+          type="submit"
+          className="composer__send"
+          disabled={loading || isComplete || draft.trim().length === 0}
+        >
           {loading ? "Sending..." : "Send"}
         </button>
       </form>

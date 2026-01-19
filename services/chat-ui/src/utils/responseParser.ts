@@ -15,9 +15,11 @@ export type ParsedResponse = {
   content: string | null;
   richContent: AssistantRichContent | null;
   conversationId: string | null;
+  state: Record<string, unknown> | null;
   shouldContinueConversation: boolean;
   messageVariant?: MessageVariant;
   error?: string;
+  isComplete: boolean;
 };
 
 /**
@@ -25,32 +27,39 @@ export type ParsedResponse = {
  */
 export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   const responseType = data?.type ?? RESPONSE_ANSWER;
-  const conversationId = data?.conversationId ?? null;
+  const conversationId = data?.conversation_id ?? data?.conversationId ?? null;
   const hasConversationId = Boolean(conversationId);
+  const state =
+    data?.state && typeof data.state === "object" && !Array.isArray(data.state)
+      ? data.state
+      : null;
   
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
   let shouldContinueConversation = hasConversationId;
   let messageVariant: MessageVariant | undefined;
   let error: string | undefined;
+  let isComplete = false;
 
   switch (responseType) {
-  case RESPONSE_ASK_USER:
+    case RESPONSE_ASK_USER:
       // Backend is asking a follow-up question
-      content = data?.prompt ?? "Kun je wat meer details delen?";
+      content = data?.text ?? "Kun je wat meer details delen?";
       shouldContinueConversation = true;
       break;
 
-  case RESPONSE_SUMMARY:
+    case RESPONSE_SUMMARY:
       content = data?.text ?? "Geen antwoord beschikbaar.";
       messageVariant = "summary";
+      shouldContinueConversation = false;
+      isComplete = true;
       break;
 
-  case RESPONSE_ANSWER:
-  case RESPONSE_NO_RESULTS:
-  case RESPONSE_NOT_RELEVANT:
+    case RESPONSE_ANSWER:
+    case RESPONSE_NO_RESULTS:
+    case RESPONSE_NOT_RELEVANT:
       // Try to parse search results from answer text
-  if (responseType === RESPONSE_ANSWER && typeof data?.text === "string") {
+      if (responseType === RESPONSE_ANSWER && typeof data?.text === "string") {
         const parsed = tryParseSearchResults(data.text);
         if (parsed) {
           richContent = { type: SEARCH_RESULTS, results: parsed };
@@ -64,14 +73,15 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       break;
 
     case RESPONSE_ERROR:
-      content = data?.reason ?? "Pixie backend gaf een foutmelding.";
-      error = data?.reason ?? "Pixie backend gaf een foutmelding.";
+      content = data?.text ?? "Pixie backend gaf een foutmelding.";
+      error = data?.text ?? "Pixie backend gaf een foutmelding.";
       shouldContinueConversation = false;
+      isComplete = true;
       break;
 
     default:
       // Fallback for unknown response types
-      content = data?.text ?? data?.prompt ?? data?.reason ?? null;
+      content = data?.text ?? null;
       shouldContinueConversation = !!conversationId;
       break;
   }
@@ -84,10 +94,12 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   return {
     content,
     richContent,
-    conversationId: shouldContinueConversation ? conversationId : null,
+    conversationId,
+    state,
     shouldContinueConversation,
     messageVariant,
     error,
+    isComplete,
   };
 }
 

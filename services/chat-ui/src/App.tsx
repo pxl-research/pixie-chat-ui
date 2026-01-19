@@ -15,7 +15,7 @@ function App() {
   const [clientError, setClientError] = useState<string | null>(null);
   const [hasEnteredChat, setHasEnteredChat] = useState(false);
 
-  const { messages, loading, error, sendMessage, reset } = useChat(client?.welcomeMessage);
+  const { messages, loading, error, sendMessage, reset, isComplete } = useChat(client?.welcomeMessage);
   const [sessionKey, setSessionKey] = useState(0);
 
   useEffect(() => {
@@ -101,6 +101,7 @@ function App() {
             onSend={sendMessage}
             loading={loading}
             error={error}
+            isComplete={isComplete}
           />
         ) : (
           <Landing

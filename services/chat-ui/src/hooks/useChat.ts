@@ -10,6 +10,13 @@ export type ChatMessage = ChatMessageType & { rich?: AssistantRichContent | null
 // Re-export types for backward compatibility from centralized types
 export type { SearchResultAttribute, SearchResultItem, SearchResultsResponse, AssistantRichContent };
 
+const createSessionId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 /**
  * Hook for managing chat state and interactions.
  */
@@ -19,7 +26,10 @@ export function useChat(initialAssistantMessage?: string) {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversationState, setConversationState] = useState<Record<string, unknown>>({});
+  const [isComplete, setIsComplete] = useState(false);
+
 
   // Reset when initial message changes
   useEffect(() => {
@@ -28,19 +38,20 @@ export function useChat(initialAssistantMessage?: string) {
     }
     setMessages(initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : []);
     setError(null);
-    setConversationId(null);
+    setSessionId(null);
+    setConversationState({});
+    setIsComplete(false);
   }, [initialAssistantMessage]);
 
   const sendMessage = useCallback(
     async (content: string) => {
+      if (isComplete) {
+        return;
+      }
       const trimmed = content.trim();
       if (!trimmed) {
         return;
       }
-
-      const history = messages
-        .map((message) => message.content?.trim())
-        .filter((value): value is string => Boolean(value));
 
       // Add user message to chat
       setMessages((prev) => [...prev, { role: ROLE_USER, content: trimmed }]);
@@ -48,18 +59,23 @@ export function useChat(initialAssistantMessage?: string) {
       setError(null);
 
       try {
+        const nextSessionId = sessionId ?? createSessionId();
         // Call API
         const apiResponse = await sendChatMessage({
-          input: trimmed,
-          conversationId,
-          history,
+          currentAnswer: trimmed,
+          sessionId: nextSessionId,
+          state: conversationState,
         });
 
         // Parse response
         const parsed = parseApiResponse(apiResponse);
 
         // Update conversation state
-        setConversationId(parsed.conversationId);
+        setSessionId(parsed.conversationId ?? nextSessionId);
+        if (parsed.state) {
+          setConversationState(parsed.state);
+        }
+        setIsComplete(parsed.isComplete);
 
         // Update error state if needed
         if (parsed.error) {
@@ -84,18 +100,22 @@ export function useChat(initialAssistantMessage?: string) {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
         setError(message);
-        setConversationId(null);
+        setSessionId(null);
+        setConversationState({});
+        setIsComplete(false);
       } finally {
         setLoading(false);
       }
     },
-    [conversationId, messages],
+    [conversationState, isComplete, sessionId],
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
     setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
     setError(null);
-    setConversationId(null);
+    setSessionId(null);
+    setConversationState({});
+    setIsComplete(false);
   }, []);
 
   return {
@@ -104,5 +124,6 @@ export function useChat(initialAssistantMessage?: string) {
     error,
     sendMessage,
     reset,
+    isComplete,
   };
 }

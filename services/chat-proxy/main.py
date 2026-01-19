@@ -93,7 +93,7 @@ def _safe_json_loads(raw: bytes) -> Optional[Dict[str, Any]]:
 def _extract_user_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     if not payload:
         return None
-    for key in ("input", "user_input", "message", "question", "text"):
+    for key in ("current_answer", "currentAnswer", "input", "user_input", "message", "question", "text"):
         value = payload.get(key)
         if isinstance(value, str):
             text = value.strip()
@@ -129,7 +129,7 @@ def _extract_summary_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
 def _extract_conversation_id(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     if not payload:
         return None
-    for key in ("conversationId", "conversation_id", "session_id"):
+    for key in ("conversationId", "conversation_id", "session_id", "sessionId"):
         value = payload.get(key)
         if isinstance(value, str):
             text = value.strip()
@@ -218,14 +218,23 @@ async def audit_middleware(request: Request, call_next):
 
     user_text = _extract_user_text(request_payload)
     assistant_text = _extract_assistant_text(response_payload)
-    if assistant_text is None and response_body:
+    summary_text = _extract_summary_text(response_payload)
+    response_type = response_payload.get("type") if response_payload else None
+    if response_type == "summary":
+        assistant_text = None
+        if summary_text is None and response_payload:
+            text_value = response_payload.get("text")
+            if isinstance(text_value, str):
+                text_value = text_value.strip()
+                if text_value:
+                    summary_text = text_value
+    elif assistant_text is None and response_body:
         try:
             decoded = response_body.decode("utf-8").strip()
         except UnicodeDecodeError:
             decoded = ""
         if decoded:
             assistant_text = decoded
-    summary_text = _extract_summary_text(response_payload)
 
     metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
 
@@ -522,18 +531,29 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
 class ChatRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    user_input: str = Field(..., alias="input")
+    session_id: str | None = None
+    current_answer: str | None = None
+    state: Dict[str, Any] | None = None
+    user_input: str | None = Field(default=None, alias="input")
     conversation_id: str | None = Field(default=None, alias="conversationId")
     history: List[str] | None = None
 
 
-async def call_qa_backend(question: str, session_id: str, history: List[str] | None) -> Dict[str, Any]:
+async def call_qa_backend(
+    current_answer: str,
+    session_id: str,
+    state: Dict[str, Any],
+    history: List[str] | None,
+) -> Dict[str, Any]:
     """Forward chat request to the QA backend `/ask` endpoint."""
     payload = {
-        "question": question,
         "session_id": session_id,
-        "history": history or [],
+        "current_answer": current_answer,
+        "state": state,
+        "question": current_answer,
     }
+    if history:
+        payload["history"] = history
 
     client = await get_http_client()
     try:
@@ -567,62 +587,75 @@ async def call_qa_backend(question: str, session_id: str, history: List[str] | N
     return data
 
 
-def build_qa_response(data: Dict[str, Any], session_id: str) -> Dict[str, Any]:
-    """Normalize QA backend responses to the UI format."""
+def _normalize_chat_response(
+    data: Dict[str, Any],
+    session_id: str,
+    fallback_state: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Normalize backend responses to the UI contract."""
+    response_type = data.get("type")
+    if not isinstance(response_type, str):
+        response_type = "summary" if _extract_summary_text(data) else "answer"
+
     text = data.get("text")
-    if text is None:
+    if not isinstance(text, str) or not text.strip():
         text = data.get("answer")
+    if (not isinstance(text, str) or not text.strip()) and response_type == "ask_user":
+        text = data.get("prompt")
+    if (not isinstance(text, str) or not text.strip()) and response_type == "error":
+        text = data.get("reason")
+    if not isinstance(text, str) or not text.strip():
+        text = data.get("prompt") or data.get("reason") or data.get("summary") or ""
 
-    response = {
-        "type": data.get("type") or "answer",
+    state = data.get("state")
+    if not isinstance(state, dict):
+        state = fallback_state
+
+    return {
+        "type": response_type or "answer",
         "text": text,
-        "prompt": data.get("prompt"),
-        "reason": data.get("reason"),
-        "conversationId": data.get("conversation_id") or data.get("conversationId") or session_id,
+        "conversation_id": data.get("conversation_id")
+        or data.get("conversationId")
+        or session_id,
+        "state": state,
     }
-
-    summary = _extract_summary_text(data)
-    if summary:
-        response["summary"] = summary
-
-    return response
 
 
 @app.post("/chat")
 async def chat(payload: ChatRequest) -> Dict[str, Any]:
     """Forward chat request to the configured Pixie backend for the active client."""
-    user_input = payload.user_input.strip()
-    if not user_input:
+    current_answer = (payload.current_answer or payload.user_input or "").strip()
+    if not current_answer:
         raise HTTPException(status_code=400, detail="Input may not be empty.")
 
     await ensure_backend_ready()
 
     if PIXIE_BACKEND_TARGET in {"informer", "questioner"}:
-        session_id = payload.conversation_id or str(uuid4())
+        session_id = payload.session_id or payload.conversation_id or str(uuid4())
+        state = payload.state if isinstance(payload.state, dict) else {}
         qa_response = await call_qa_backend(
-            question=user_input,
+            current_answer=current_answer,
             session_id=session_id,
+            state=state,
             history=payload.history,
         )
-        return build_qa_response(qa_response, session_id)
+        return _normalize_chat_response(qa_response, session_id, state)
 
-    if payload.conversation_id:
-        pixie_payload = {"conversation_id": payload.conversation_id, "message": user_input}
+    has_session = bool(payload.session_id or payload.conversation_id)
+    session_id = payload.session_id or payload.conversation_id or str(uuid4())
+    state = payload.state if isinstance(payload.state, dict) else {}
+    if has_session:
+        pixie_payload = {"conversation_id": session_id, "message": current_answer}
     else:
-        pixie_payload = {"question": user_input}
+        pixie_payload = {"question": current_answer}
+    pixie_payload.update(
+        {
+            "session_id": session_id,
+            "current_answer": current_answer,
+            "state": state,
+        }
+    )
 
     pixie_response = await call_pixie(pixie_payload)
 
-    response = {
-        "type": pixie_response.get("type"),
-        "text": pixie_response.get("text"),
-        "prompt": pixie_response.get("prompt"),
-        "reason": pixie_response.get("reason"),
-        "conversationId": pixie_response.get("conversation_id"),
-    }
-
-    summary = _extract_summary_text(pixie_response)
-    if summary:
-        response["summary"] = summary
-
-    return response
+    return _normalize_chat_response(pixie_response, session_id, state)
