@@ -339,6 +339,20 @@ AUDIT_API_KEY = os.environ.get("AUDIT_API_KEY", "").strip()
 AUDIT_LOG_TIMEOUT_MS = max(0, _get_int_env("AUDIT_LOG_TIMEOUT_MS", 250))
 AUDIT_DEBUG_LOGGING = _parse_bool(os.environ.get("AUDIT_DEBUG_LOGGING", "false"))
 
+
+def _configure_audit_logger() -> None:
+    if not AUDIT_DEBUG_LOGGING:
+        return
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+_configure_audit_logger()
+
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
 
