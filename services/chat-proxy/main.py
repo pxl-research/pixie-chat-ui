@@ -1,20 +1,14 @@
-import asyncio
-import json
-import logging
 import os
-import time
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
-from starlette.responses import StreamingResponse
 
 app = FastAPI()
-logger = logging.getLogger("audit")
 
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
@@ -64,75 +58,6 @@ def _parse_landing_presets(raw: str) -> list[dict[str, str]]:
     return presets
 
 
-def _parse_bool(raw: str) -> bool:
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _get_int_env(name: str, default: int) -> int:
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError:
-        return default
-
-
-def _truncate_text(value: Optional[str], limit: int = 200) -> Optional[str]:
-    if value is None:
-        return None
-    text = value.strip()
-    if len(text) > limit:
-        return f"{text[:limit]}...[{len(text)} chars]"
-    return text
-
-
-def _truncate_value(value: Any, limit: int = 2000) -> str:
-    try:
-        raw = json.dumps(value, ensure_ascii=True, default=str)
-    except (TypeError, ValueError):
-        raw = repr(value)
-    if len(raw) > limit:
-        return f"{raw[:limit]}...[{len(raw)} chars]"
-    return raw
-
-
-def _safe_json_loads(raw: bytes) -> Optional[Dict[str, Any]]:
-    if not raw:
-        return None
-    try:
-        payload = json.loads(raw)
-    except ValueError:
-        return None
-    if isinstance(payload, dict):
-        return payload
-    return None
-
-
-def _extract_user_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not payload:
-        return None
-    for key in ("current_answer", "currentAnswer", "input", "user_input", "message", "question", "text"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            text = value.strip()
-            if text:
-                return text
-    return None
-
-
-def _extract_assistant_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not payload:
-        return None
-    for key in ("text", "answer", "message", "detail"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            text = value.strip()
-            if text:
-                return text
-    return None
-
-
 def _extract_summary_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     if not payload:
         return None
@@ -145,60 +70,6 @@ def _extract_summary_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
-def _extract_conversation_id(payload: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not payload:
-        return None
-    for key in ("conversationId", "conversation_id", "session_id", "sessionId"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            text = value.strip()
-            if text:
-                return text
-    return None
-
-
-def _resolve_conversation_id(
-    request: Request,
-    request_payload: Optional[Dict[str, Any]],
-    response_payload: Optional[Dict[str, Any]],
-) -> str:
-    header_value = request.headers.get("X-Conversation-Id")
-    if header_value and header_value.strip():
-        return header_value.strip()
-    if request_payload:
-        conversation_id = _extract_conversation_id(request_payload)
-        if conversation_id:
-            return conversation_id
-    if response_payload:
-        conversation_id = _extract_conversation_id(response_payload)
-        if conversation_id:
-            return conversation_id
-    return str(uuid4())
-
-
-def _build_audit_metadata(
-    request: Request,
-    response: Any,
-    latency_ms: int,
-    response_payload: Optional[Dict[str, Any]],
-) -> Dict[str, Any]:
-    request_id = request.headers.get("X-Request-Id") or request.headers.get("X-Request-ID")
-    metadata: Dict[str, Any] = {
-        "request_id": request_id,
-        "route": request.url.path,
-        "status_code": response.status_code,
-        "latency_ms": latency_ms,
-    }
-    if response_payload:
-        prompt = response_payload.get("prompt")
-        if isinstance(prompt, str) and prompt.strip():
-            metadata["prompt"] = prompt
-        model = response_payload.get("model")
-        if isinstance(model, str) and model.strip():
-            metadata["model"] = model
-    return {key: value for key, value in metadata.items() if value is not None}
-
-
 CORS_ALLOW_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", DEFAULT_CORS_ALLOW_ORIGINS)
 ALLOWED_ORIGINS = _parse_origins(CORS_ALLOW_ORIGINS)
 
@@ -208,105 +79,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def audit_middleware(request: Request, call_next):
-    if not AUDIT_LOGGING_ENABLED:
-        return await call_next(request)
-    if request.method.upper() != "POST" or request.url.path != "/chat":
-        return await call_next(request)
-
-    request_body = await request.body()
-    request_payload = _safe_json_loads(request_body)
-    if AUDIT_DEBUG_LOGGING:
-        if request_payload is not None:
-            logger.info(
-                "Audit debug: request %s %s json=%s",
-                request.method,
-                request.url.path,
-                _truncate_value(request_payload, 4000),
-            )
-        else:
-            raw_body = request_body.decode("utf-8", errors="replace") if request_body else ""
-            logger.info(
-                "Audit debug: request %s %s raw=%s",
-                request.method,
-                request.url.path,
-                _truncate_text(raw_body, 4000),
-            )
-
-    start = time.perf_counter()
-    response = await call_next(request)
-    latency_ms = int((time.perf_counter() - start) * 1000)
-
-    if isinstance(response, StreamingResponse):
-        conversation_id = _resolve_conversation_id(request, request_payload, None)
-        response.headers["X-Conversation-Id"] = conversation_id
-        return response
-
-    response_body = getattr(response, "body", b"") or b""
-    response_payload = _safe_json_loads(response_body)
-    if AUDIT_DEBUG_LOGGING:
-        if response_payload is not None:
-            logger.info(
-                "Audit debug: response status=%s json=%s",
-                response.status_code,
-                _truncate_value(response_payload, 4000),
-            )
-        else:
-            raw_body = response_body.decode("utf-8", errors="replace") if response_body else ""
-            logger.info(
-                "Audit debug: response status=%s raw=%s",
-                response.status_code,
-                _truncate_text(raw_body, 4000),
-            )
-
-    conversation_id = _resolve_conversation_id(request, request_payload, response_payload)
-    response.headers["X-Conversation-Id"] = conversation_id
-
-    user_text = _extract_user_text(request_payload)
-    assistant_text = _extract_assistant_text(response_payload)
-    summary_text = _extract_summary_text(response_payload)
-    response_type = response_payload.get("type") if response_payload else None
-    if response_type == "summary" and assistant_text is None and response_payload:
-        text_value = response_payload.get("text")
-        if isinstance(text_value, str):
-            text_value = text_value.strip()
-            if text_value:
-                assistant_text = text_value
-    if assistant_text is None and response_body:
-        try:
-            decoded = response_body.decode("utf-8").strip()
-        except UnicodeDecodeError:
-            decoded = ""
-        if decoded:
-            assistant_text = decoded
-
-    metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
-    if AUDIT_DEBUG_LOGGING:
-        logger.info(
-            "Audit debug: response_type=%s conversation_id=%s user_text=%r assistant_text=%r summary_text=%r",
-            response_type,
-            conversation_id,
-            _truncate_text(user_text),
-            _truncate_text(assistant_text),
-            _truncate_text(summary_text),
-        )
-
-    payload = _build_audit_payload(
-        conversation_id=conversation_id,
-        profile=PIXIE_PROFILE,
-        user_text=user_text,
-        assistant_text=assistant_text,
-        summary_text=summary_text,
-        metadata=metadata,
-    )
-    if AUDIT_DEBUG_LOGGING and payload:
-        logger.info("Audit debug: audit payload=%s", _truncate_value(payload, 4000))
-    if _audit_client is not None and payload:
-        asyncio.create_task(_send_audit_payload(payload, conversation_id=conversation_id))
-    return response
 
 # Determine target backend (recommender, informer, questioner)
 PIXIE_BACKEND_TARGET = (os.environ.get("PIXIE_BACKEND_TARGET") or DEFAULT_BACKEND_TARGET).strip().lower()
@@ -331,35 +103,12 @@ BACKEND_BASE_URLS: Dict[str, str] = {
 }
 BACKEND_BASE_URL: str = BACKEND_BASE_URLS[PIXIE_BACKEND_TARGET]
 
-PIXIE_PROFILE = (os.environ.get("PIXIE_PROFILE") or PIXIE_BACKEND_TARGET).strip().lower()
-
-AUDIT_LOGGING_ENABLED = _parse_bool(os.environ.get("AUDIT_LOGGING_ENABLED", "false"))
-AUDIT_API_URL = _normalize_url(os.environ.get("AUDIT_API_URL", ""))
-AUDIT_API_KEY = os.environ.get("AUDIT_API_KEY", "").strip()
-AUDIT_LOG_TIMEOUT_MS = max(0, _get_int_env("AUDIT_LOG_TIMEOUT_MS", 250))
-AUDIT_DEBUG_LOGGING = _parse_bool(os.environ.get("AUDIT_DEBUG_LOGGING", "false"))
-
-
-def _configure_audit_logger() -> None:
-    if not AUDIT_DEBUG_LOGGING:
-        return
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
-
-_configure_audit_logger()
-
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
 
 BackendHealth = Dict[str, Optional[Any]]
 _backend_health: BackendHealth = {"status": "unknown", "detail": None, "checked_at": None}
 _http_client: Optional[httpx.AsyncClient] = None
-_audit_client: Optional[httpx.AsyncClient] = None
 
 
 def build_client_payload() -> Dict[str, Any]:
@@ -413,63 +162,6 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _build_audit_payload(
-    *,
-    conversation_id: str,
-    profile: str,
-    user_text: Optional[str],
-    assistant_text: Optional[str],
-    summary_text: Optional[str],
-    metadata: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-    messages: list[Dict[str, Any]] = []
-    if user_text is not None:
-        messages.append({"role": "user", "content": user_text})
-    if assistant_text is not None:
-        messages.append({"role": "assistant", "content": assistant_text})
-    if summary_text is not None:
-        messages.append({"role": "summary", "content": summary_text})
-
-    if not messages:
-        return None
-
-    return {
-        "conversation_id": conversation_id,
-        "profile": profile,
-        "messages": messages,
-        "metadata": metadata,
-    }
-
-
-async def _send_audit_payload(
-    payload: Dict[str, Any],
-    *,
-    conversation_id: str,
-) -> None:
-    if _audit_client is None:
-        return
-    headers = {"Content-Type": "application/json"}
-    if AUDIT_API_KEY:
-        headers["X-API-Key"] = AUDIT_API_KEY
-    timeout = AUDIT_LOG_TIMEOUT_MS / 1000.0 if AUDIT_LOG_TIMEOUT_MS else None
-
-    try:
-        response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
-        if AUDIT_DEBUG_LOGGING:
-            logger.info(
-                "Audit debug: audit api status=%s body=%s",
-                response.status_code,
-                _truncate_text(response.text, 4000),
-            )
-        if response.status_code >= 400:
-            logger.warning(
-                "Audit API rejected event",
-                extra={"conversation_id": conversation_id, "status_code": response.status_code},
-            )
-    except httpx.HTTPError:
-        logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
-
-
 async def get_http_client() -> httpx.AsyncClient:
     if _http_client is None:
         raise RuntimeError("HTTP client not initialized")
@@ -513,30 +205,17 @@ async def ensure_backend_ready() -> None:
 
 @app.on_event("startup")
 async def startup_check() -> None:
-    global _audit_client, _http_client
+    global _http_client
     _http_client = httpx.AsyncClient(base_url=BACKEND_BASE_URL, timeout=30.0)
     await refresh_backend_health(force=True)
-    if AUDIT_LOGGING_ENABLED and AUDIT_API_URL:
-        try:
-            _audit_client = httpx.AsyncClient(base_url=AUDIT_API_URL)
-        except Exception:
-            logger.exception("Failed to initialize audit logging client")
-            _audit_client = None
-    elif AUDIT_LOGGING_ENABLED:
-        logger.warning(
-            "AUDIT_LOGGING_ENABLED is true but AUDIT_API_URL is not set; audit logging disabled."
-        )
 
 
 @app.on_event("shutdown")
 async def shutdown_client() -> None:
-    global _audit_client, _http_client
+    global _http_client
     if _http_client is not None:
         await _http_client.aclose()
         _http_client = None
-    if _audit_client is not None:
-        await _audit_client.aclose()
-        _audit_client = None
 
 
 @app.get("/health")

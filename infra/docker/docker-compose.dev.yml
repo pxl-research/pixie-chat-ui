@@ -22,11 +22,6 @@ services:
       PIXIE_CORE_API_BASE_URL: http://recommender-api:8000
       PIXIE_INFORMER_API_BASE_URL: http://informer-api:8000
       PIXIE_QUESTIONER_API_BASE_URL: http://questioner-api:8000
-      AUDIT_LOGGING_ENABLED: ${AUDIT_LOGGING_ENABLED:-true}
-      AUDIT_API_URL: ${AUDIT_API_URL:-http://audit-api:8000}
-      AUDIT_API_KEY: ${AUDIT_API_KEY:-}
-      AUDIT_LOG_TIMEOUT_MS: ${AUDIT_LOG_TIMEOUT_MS:-250}
-      PIXIE_PROFILE: ${PIXIE_PROFILE:-informer}
     networks:
       - default
       - pixie
