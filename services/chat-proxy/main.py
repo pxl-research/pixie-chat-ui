@@ -78,6 +78,25 @@ def _get_int_env(name: str, default: int) -> int:
         return default
 
 
+def _truncate_text(value: Optional[str], limit: int = 200) -> Optional[str]:
+    if value is None:
+        return None
+    text = value.strip()
+    if len(text) > limit:
+        return f"{text[:limit]}...[{len(text)} chars]"
+    return text
+
+
+def _truncate_value(value: Any, limit: int = 2000) -> str:
+    try:
+        raw = json.dumps(value, ensure_ascii=True, default=str)
+    except (TypeError, ValueError):
+        raw = repr(value)
+    if len(raw) > limit:
+        return f"{raw[:limit]}...[{len(raw)} chars]"
+    return raw
+
+
 def _safe_json_loads(raw: bytes) -> Optional[Dict[str, Any]]:
     if not raw:
         return None
@@ -200,6 +219,22 @@ async def audit_middleware(request: Request, call_next):
 
     request_body = await request.body()
     request_payload = _safe_json_loads(request_body)
+    if AUDIT_DEBUG_LOGGING:
+        if request_payload is not None:
+            logger.info(
+                "Audit debug: request %s %s json=%s",
+                request.method,
+                request.url.path,
+                _truncate_value(request_payload, 4000),
+            )
+        else:
+            raw_body = request_body.decode("utf-8", errors="replace") if request_body else ""
+            logger.info(
+                "Audit debug: request %s %s raw=%s",
+                request.method,
+                request.url.path,
+                _truncate_text(raw_body, 4000),
+            )
 
     start = time.perf_counter()
     response = await call_next(request)
@@ -212,6 +247,20 @@ async def audit_middleware(request: Request, call_next):
 
     response_body = getattr(response, "body", b"") or b""
     response_payload = _safe_json_loads(response_body)
+    if AUDIT_DEBUG_LOGGING:
+        if response_payload is not None:
+            logger.info(
+                "Audit debug: response status=%s json=%s",
+                response.status_code,
+                _truncate_value(response_payload, 4000),
+            )
+        else:
+            raw_body = response_body.decode("utf-8", errors="replace") if response_body else ""
+            logger.info(
+                "Audit debug: response status=%s raw=%s",
+                response.status_code,
+                _truncate_text(raw_body, 4000),
+            )
 
     conversation_id = _resolve_conversation_id(request, request_payload, response_payload)
     response.headers["X-Conversation-Id"] = conversation_id
@@ -235,6 +284,15 @@ async def audit_middleware(request: Request, call_next):
             assistant_text = decoded
 
     metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
+    if AUDIT_DEBUG_LOGGING:
+        logger.info(
+            "Audit debug: response_type=%s conversation_id=%s user_text=%r assistant_text=%r summary_text=%r",
+            response_type,
+            conversation_id,
+            _truncate_text(user_text),
+            _truncate_text(assistant_text),
+            _truncate_text(summary_text),
+        )
 
     payload = _build_audit_payload(
         conversation_id=conversation_id,
@@ -244,6 +302,8 @@ async def audit_middleware(request: Request, call_next):
         summary_text=summary_text,
         metadata=metadata,
     )
+    if AUDIT_DEBUG_LOGGING and payload:
+        logger.info("Audit debug: audit payload=%s", _truncate_value(payload, 4000))
     if _audit_client is not None and payload:
         asyncio.create_task(_send_audit_payload(payload, conversation_id=conversation_id))
     return response
@@ -277,6 +337,7 @@ AUDIT_LOGGING_ENABLED = _parse_bool(os.environ.get("AUDIT_LOGGING_ENABLED", "fal
 AUDIT_API_URL = _normalize_url(os.environ.get("AUDIT_API_URL", ""))
 AUDIT_API_KEY = os.environ.get("AUDIT_API_KEY", "").strip()
 AUDIT_LOG_TIMEOUT_MS = max(0, _get_int_env("AUDIT_LOG_TIMEOUT_MS", 250))
+AUDIT_DEBUG_LOGGING = _parse_bool(os.environ.get("AUDIT_DEBUG_LOGGING", "false"))
 
 HEALTH_PATH = "/health"
 HEALTH_CACHE_SECONDS = 15
@@ -380,6 +441,12 @@ async def _send_audit_payload(
 
     try:
         response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
+        if AUDIT_DEBUG_LOGGING:
+            logger.info(
+                "Audit debug: audit api status=%s body=%s",
+                response.status_code,
+                _truncate_text(response.text, 4000),
+            )
         if response.status_code >= 400:
             logger.warning(
                 "Audit API rejected event",
