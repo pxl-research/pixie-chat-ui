@@ -9,6 +9,7 @@ export type ChatApiRequest = {
 export type ChatApiResponse = {
   type?: string;
   text?: string | null;
+  summary?: string | null;
   conversation_id?: string | null;
   conversationId?: string | null;
   state?: Record<string, unknown> | null;

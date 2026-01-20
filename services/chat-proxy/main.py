@@ -221,13 +221,17 @@ async def audit_middleware(request: Request, call_next):
     summary_text = _extract_summary_text(response_payload)
     response_type = response_payload.get("type") if response_payload else None
     if response_type == "summary":
-        assistant_text = None
-        if summary_text is None and response_payload:
-            text_value = response_payload.get("text")
-            if isinstance(text_value, str):
-                text_value = text_value.strip()
-                if text_value:
-                    summary_text = text_value
+        if summary_text:
+            if response_payload:
+                text_value = response_payload.get("text")
+                if isinstance(text_value, str):
+                    text_value = text_value.strip()
+                    if text_value:
+                        assistant_text = text_value
+        else:
+            if assistant_text:
+                summary_text = assistant_text
+            assistant_text = None
     elif assistant_text is None and response_body:
         try:
             decoded = response_body.decode("utf-8").strip()
@@ -611,7 +615,7 @@ def _normalize_chat_response(
     if not isinstance(state, dict):
         state = fallback_state
 
-    return {
+    response: Dict[str, Any] = {
         "type": response_type or "answer",
         "text": text,
         "conversation_id": data.get("conversation_id")
@@ -619,6 +623,10 @@ def _normalize_chat_response(
         or session_id,
         "state": state,
     }
+    summary_text = _extract_summary_text(data)
+    if response_type == "summary" and summary_text:
+        response["summary"] = summary_text
+    return response
 
 
 @app.post("/chat")

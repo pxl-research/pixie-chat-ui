@@ -93,7 +93,16 @@ export function useChat(initialAssistantMessage?: string) {
               role: ROLE_ASSISTANT,
               content: assistantContent,
               rich: parsed.richContent,
-              variant: parsed.messageVariant,
+            },
+          ]);
+        }
+        if (parsed.summaryContent) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: ROLE_ASSISTANT,
+              content: parsed.summaryContent,
+              variant: parsed.messageVariant ?? "summary",
             },
           ]);
         }

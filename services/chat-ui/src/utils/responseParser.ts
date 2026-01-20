@@ -16,6 +16,7 @@ export type ParsedResponse = {
   richContent: AssistantRichContent | null;
   conversationId: string | null;
   state: Record<string, unknown> | null;
+  summaryContent: string | null;
   shouldContinueConversation: boolean;
   messageVariant?: MessageVariant;
   error?: string;
@@ -36,6 +37,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
+  let summaryContent: string | null = null;
   let shouldContinueConversation = hasConversationId;
   let messageVariant: MessageVariant | undefined;
   let error: string | undefined;
@@ -50,7 +52,11 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
 
     case RESPONSE_SUMMARY:
       content = data?.text ?? "Geen antwoord beschikbaar.";
-      messageVariant = "summary";
+      if (typeof data?.summary === "string") {
+        const trimmedSummary = data.summary.trim();
+        summaryContent = trimmedSummary ? trimmedSummary : null;
+      }
+      messageVariant = summaryContent ? "summary" : undefined;
       shouldContinueConversation = false;
       isComplete = true;
       break;
@@ -96,6 +102,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     richContent,
     conversationId,
     state,
+    summaryContent,
     shouldContinueConversation,
     messageVariant,
     error,
