@@ -96,12 +96,13 @@ export function useChat(initialAssistantMessage?: string) {
             },
           ]);
         }
-        if (parsed.summaryContent) {
+        const summaryContent = parsed.summaryContent;
+        if (summaryContent) {
           setMessages((prev) => [
             ...prev,
             {
               role: ROLE_ASSISTANT,
-              content: parsed.summaryContent,
+              content: summaryContent,
               variant: parsed.messageVariant ?? "summary",
             },
           ]);
