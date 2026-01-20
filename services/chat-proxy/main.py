@@ -220,19 +220,13 @@ async def audit_middleware(request: Request, call_next):
     assistant_text = _extract_assistant_text(response_payload)
     summary_text = _extract_summary_text(response_payload)
     response_type = response_payload.get("type") if response_payload else None
-    if response_type == "summary":
-        if summary_text:
-            if response_payload:
-                text_value = response_payload.get("text")
-                if isinstance(text_value, str):
-                    text_value = text_value.strip()
-                    if text_value:
-                        assistant_text = text_value
-        else:
-            if assistant_text:
-                summary_text = assistant_text
-            assistant_text = None
-    elif assistant_text is None and response_body:
+    if response_type == "summary" and assistant_text is None and response_payload:
+        text_value = response_payload.get("text")
+        if isinstance(text_value, str):
+            text_value = text_value.strip()
+            if text_value:
+                assistant_text = text_value
+    if assistant_text is None and response_body:
         try:
             decoded = response_body.decode("utf-8").strip()
         except UnicodeDecodeError:
@@ -242,7 +236,7 @@ async def audit_middleware(request: Request, call_next):
 
     metadata = _build_audit_metadata(request, response, latency_ms, response_payload)
 
-    payloads = _build_audit_payloads(
+    payload = _build_audit_payload(
         conversation_id=conversation_id,
         profile=PIXIE_PROFILE,
         user_text=user_text,
@@ -250,8 +244,8 @@ async def audit_middleware(request: Request, call_next):
         summary_text=summary_text,
         metadata=metadata,
     )
-    if _audit_client is not None and payloads:
-        asyncio.create_task(_send_audit_payloads(payloads, conversation_id=conversation_id))
+    if _audit_client is not None and payload:
+        asyncio.create_task(_send_audit_payload(payload, conversation_id=conversation_id))
     return response
 
 # Determine target backend (recommender, informer, questioner)
@@ -344,7 +338,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _build_audit_payloads(
+def _build_audit_payload(
     *,
     conversation_id: str,
     profile: str,
@@ -352,66 +346,47 @@ def _build_audit_payloads(
     assistant_text: Optional[str],
     summary_text: Optional[str],
     metadata: Dict[str, Any],
-) -> list[Dict[str, Any]]:
-    payloads: list[Dict[str, Any]] = []
-    base: Dict[str, Any] = {
+) -> Optional[Dict[str, Any]]:
+    messages: list[Dict[str, Any]] = []
+    if user_text is not None:
+        messages.append({"role": "user", "content": user_text})
+    if assistant_text is not None:
+        messages.append({"role": "assistant", "content": assistant_text})
+    if summary_text is not None:
+        messages.append({"role": "summary", "content": summary_text})
+
+    if not messages:
+        return None
+
+    return {
         "conversation_id": conversation_id,
         "profile": profile,
+        "messages": messages,
         "metadata": metadata,
     }
-    if user_text is not None:
-        payloads.append(
-            {
-                **base,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_text,
-                        "metadata": metadata,
-                    }
-                ],
-            }
-        )
-    if assistant_text is not None:
-        payloads.append(
-            {
-                **base,
-                "messages": [
-                    {
-                        "role": "assistant",
-                        "content": assistant_text,
-                        "metadata": metadata,
-                    }
-                ],
-            }
-        )
-    if summary_text is not None:
-        payloads.append({**base, "summary": summary_text})
-    return payloads
 
 
-async def _send_audit_payloads(
-    payloads: list[Dict[str, Any]],
+async def _send_audit_payload(
+    payload: Dict[str, Any],
     *,
     conversation_id: str,
 ) -> None:
-    if _audit_client is None or not payloads:
+    if _audit_client is None:
         return
     headers = {"Content-Type": "application/json"}
     if AUDIT_API_KEY:
         headers["X-API-Key"] = AUDIT_API_KEY
     timeout = AUDIT_LOG_TIMEOUT_MS / 1000.0 if AUDIT_LOG_TIMEOUT_MS else None
 
-    for payload in payloads:
-        try:
-            response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
-            if response.status_code >= 400:
-                logger.warning(
-                    "Audit API rejected event",
-                    extra={"conversation_id": conversation_id, "status_code": response.status_code},
-                )
-        except httpx.HTTPError:
-            logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
+    try:
+        response = await _audit_client.post("/events", json=payload, headers=headers, timeout=timeout)
+        if response.status_code >= 400:
+            logger.warning(
+                "Audit API rejected event",
+                extra={"conversation_id": conversation_id, "status_code": response.status_code},
+            )
+    except httpx.HTTPError:
+        logger.exception("Audit API request failed", extra={"conversation_id": conversation_id})
 
 
 async def get_http_client() -> httpx.AsyncClient:
