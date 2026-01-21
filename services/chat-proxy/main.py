@@ -7,6 +7,9 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -187,10 +190,12 @@ async def refresh_backend_health(force: bool = False) -> BackendHealth:
             "detail": None,
             "checked_at": _now(),
         }
+        # Log detailed exception server-side but avoid exposing it via the public API.
+        logger.warning("Backend health check failed", exc_info=exc)
     except httpx.HTTPError as exc:
         _backend_health = {
             "status": "unhealthy",
-            "detail": f"Health check failed: {exc}",
+            "detail": "Health check failed",
             "checked_at": _now(),
         }
 
