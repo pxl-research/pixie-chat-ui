@@ -77,6 +77,9 @@ main {
   justify-content: center;
   width: 100%;
   max-width: 960px;
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .landing__panel {
@@ -506,6 +509,13 @@ main {
 
   .landing__title {
     font-size: 1.5rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .landing {
+    align-items: flex-start;
+    padding: 1rem 0 calc(1rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
