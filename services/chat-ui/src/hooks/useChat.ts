@@ -11,12 +11,13 @@ export type ChatMessage = ChatMessageType & { rich?: AssistantRichContent | null
 export type { SearchResultAttribute, SearchResultItem, SearchResultsResponse, AssistantRichContent };
 
 const createSessionId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const cryptoObj = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (cryptoObj?.randomUUID) {
+    return cryptoObj.randomUUID();
   }
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+  if (cryptoObj?.getRandomValues) {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
+    cryptoObj.getRandomValues(bytes);
     return Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
