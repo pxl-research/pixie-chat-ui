@@ -14,6 +14,15 @@ const createSessionId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  // Fallback for very old environments without `crypto`.
+  // This should not be relied on for security-sensitive contexts.
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
