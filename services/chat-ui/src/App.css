@@ -1,10 +1,14 @@
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   background-color: #f9fafb;
   color: #111827;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app--chat {
+  height: 100vh;
 }
 
 .app-centered {

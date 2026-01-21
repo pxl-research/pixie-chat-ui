@@ -83,8 +83,10 @@ function App() {
     client.chatHeader?.title?.trim() || `${client.displayName} Assistant`;
   const chatHeaderLogoUrl = client.chatHeader?.logoUrl?.trim() || client.theme.logoUrl;
 
+  const appClassName = `app ${hasEnteredChat ? "app--chat" : "app--landing"}`;
+
   return (
-    <div className="app" style={{ ...backgroundStyle, ...themeStyle }}>
+    <div className={appClassName} style={{ ...backgroundStyle, ...themeStyle }}>
       <Header
         displayName={client.displayName}
         theme={client.theme}
