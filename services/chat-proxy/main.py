@@ -190,9 +190,9 @@ async def refresh_backend_health(force: bool = False) -> BackendHealth:
             "detail": None,
             "checked_at": _now(),
         }
+    except httpx.HTTPError as exc:
         # Log detailed exception server-side but avoid exposing it via the public API.
         logger.warning("Backend health check failed", exc_info=exc)
-    except httpx.HTTPError as exc:
         _backend_health = {
             "status": "unhealthy",
             "detail": "Health check failed",
