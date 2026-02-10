@@ -79,9 +79,12 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       ? (data as Record<string, unknown>)
       : null;
   const textContent = extractFirstString(dataObject, ["text", "answer", "prompt", "reason"]);
-  const summaryContent =
-    extractFirstString(dataObject, ["summary", "summary_text", "summaryText"]) ??
-    extractFirstString(state, ["summary", "summary_text", "summaryText"]);
+  let summaryContent = extractFirstString(dataObject, ["summary", "summary_text", "summaryText"]);
+  if (!summaryContent && responseType === RESPONSE_SUMMARY) {
+    // Backward-compatible fallback: only use state summary when backend explicitly
+    // marks the response as summary. Never surface intake state summaries.
+    summaryContent = extractFirstString(state, ["summary", "summary_text", "summaryText"]);
+  }
   const followUpQuestionContent =
     extractFirstString(dataObject, [
       "follow_up_question",
