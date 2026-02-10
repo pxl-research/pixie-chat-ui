@@ -70,21 +70,15 @@ export function SearchResultsCarousel({ results }: SearchResultsCarouselProps) {
   const items = useMemo(() => results.items?.filter(Boolean) ?? [], [results.items]);
   const [index, setIndex] = useState(0);
 
-  if (items.length === 0) {
-    return null;
-  }
-
-  const count = typeof results.count === "number" ? results.count : undefined;
-  const displayedCount = count ?? items.length;
-
   const humanSorting = useMemo(() => {
     const sortedBy = results.sorted_by;
     if (!sortedBy || typeof sortedBy !== "object") {
       return null;
     }
 
-    const field = typeof (sortedBy as any).field === "string" ? (sortedBy as any).field : undefined;
-    const order = typeof (sortedBy as any).order === "string" ? (sortedBy as any).order : undefined;
+    const sortInfo = sortedBy as { field?: unknown; order?: unknown };
+    const field = typeof sortInfo.field === "string" ? sortInfo.field : undefined;
+    const order = typeof sortInfo.order === "string" ? sortInfo.order : undefined;
 
     if (!field && !order) {
       return null;
@@ -105,6 +99,13 @@ export function SearchResultsCarousel({ results }: SearchResultsCarouselProps) {
 
     return `Gesorteerd op ${fieldLabel}, ${orderLabel}`;
   }, [results.sorted_by]);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  const count = typeof results.count === "number" ? results.count : undefined;
+  const displayedCount = count ?? items.length;
 
   const goPrev = () => setIndex((prev) => Math.max(prev - 1, 0));
   const goNext = () => setIndex((prev) => Math.min(prev + 1, items.length - 1));
