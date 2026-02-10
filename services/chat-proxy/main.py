@@ -352,12 +352,12 @@ async def call_qa_backend(
         data = response.json()
     except ValueError as exc:
         raise HTTPException(
-            status_code=502, detail="Invalid JSON received from Pixie Informer"
+            status_code=502, detail=f"Invalid JSON received from Pixie {PIXIE_BACKEND_TARGET}"
         ) from exc
 
     if not isinstance(data, dict):
         raise HTTPException(
-            status_code=502, detail="Unexpected response format from Pixie Informer"
+            status_code=502, detail=f"Unexpected response format from Pixie {PIXIE_BACKEND_TARGET}"
         )
 
     contract_version: str | None = None
