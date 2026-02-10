@@ -35,6 +35,14 @@ function trimToNonEmptyString(value: unknown): string | null {
 }
 
 function isFeedbackComplete(state: Record<string, unknown> | null): boolean {
+  const phase = state?.phase;
+  if (phase === "completed") {
+    return true;
+  }
+  const feedbackStatus = state?.feedback_status;
+  if (feedbackStatus === "yes" || feedbackStatus === "no") {
+    return true;
+  }
   const feedbackRequested = state?.feedback_requested;
   return feedbackRequested === "false" || feedbackRequested === false;
 }

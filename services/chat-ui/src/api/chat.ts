@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config/client";
+import { CHAT_CONTRACT_VERSION, type QuestionerChatContractResponse } from "./contract";
 
 export type ChatApiRequest = {
   currentAnswer: string;
@@ -15,7 +16,10 @@ export type ChatApiResponse = {
   conversation_id?: string | null;
   conversationId?: string | null;
   state?: Record<string, unknown> | null;
+  contract_version?: string | null;
 };
+
+export type ChatContractResponse = QuestionerChatContractResponse;
 
 /**
  * Send a chat message to the backend API.
@@ -54,5 +58,21 @@ export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiR
     throw new Error(detailMessage || `Request failed with status ${response.status}`);
   }
 
-  return response.json();
+  const contractHeader = response.headers.get("X-Pixie-Chat-Contract");
+  if (contractHeader && contractHeader !== CHAT_CONTRACT_VERSION) {
+    throw new Error(
+      `Incompatible chat contract version '${contractHeader}'. Expected '${CHAT_CONTRACT_VERSION}'.`,
+    );
+  }
+
+  const parsed = await response.json();
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid JSON response format.");
+  }
+
+  const normalizedResponse = parsed as ChatApiResponse;
+  if (contractHeader) {
+    return { ...normalizedResponse, contract_version: contractHeader };
+  }
+  return normalizedResponse;
 }
