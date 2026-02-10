@@ -442,10 +442,8 @@ async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
             history=payload.history,
         )
         qa_data, contract_version = qa_response
-        if PIXIE_BACKEND_TARGET == "questioner":
-            response.headers["X-Pixie-Chat-Contract"] = (
-                contract_version or PIXIE_CHAT_CONTRACT_VERSION
-            )
+        if PIXIE_BACKEND_TARGET == "questioner" and contract_version is not None:
+            response.headers["X-Pixie-Chat-Contract"] = contract_version
         return _normalize_chat_response(qa_data, session_id, state)
 
     has_session = bool(payload.session_id or payload.conversation_id)
