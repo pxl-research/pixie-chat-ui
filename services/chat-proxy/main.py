@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 import logging
@@ -15,6 +15,7 @@ app = FastAPI()
 
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
+DEFAULT_CHAT_CONTRACT_VERSION = "chat-v1.0.0"
 DEFAULT_LANDING_TITLE = "Welkom bij onze AI-assistent"
 DEFAULT_LANDING_RESEARCH_NOTE = (
     "Deze AI-assistent maakt deel uit van een TETRA-onderzoeksproject. De antwoorden zijn experimenteel en kunnen onvolledig of onjuist zijn."
@@ -22,6 +23,12 @@ DEFAULT_LANDING_RESEARCH_NOTE = (
 DEFAULT_LANDING_PRIVACY_NOTE = (
     "We vragen of bewaren geen persoonsgegevens. Anonieme gebruiksgegevens worden verzameld om het onderzoek te verbeteren, met respect voor de GDPR-richtlijnen."
 )
+
+
+def _parse_bool(raw: str, default: bool = False) -> bool:
+    if not raw:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _normalize_url(raw: str) -> str:
@@ -104,6 +111,12 @@ app.add_middleware(
 
 # Determine target backend (recommender, informer, questioner)
 PIXIE_BACKEND_TARGET = (os.environ.get("PIXIE_BACKEND_TARGET") or DEFAULT_BACKEND_TARGET).strip().lower()
+PIXIE_CHAT_CONTRACT_VERSION = (
+    os.environ.get("PIXIE_CHAT_CONTRACT_VERSION") or DEFAULT_CHAT_CONTRACT_VERSION
+).strip()
+STRICT_QUESTIONER_CHAT_CONTRACT = _parse_bool(
+    os.environ.get("STRICT_QUESTIONER_CHAT_CONTRACT", "true"), default=True
+)
 
 if PIXIE_BACKEND_TARGET not in {"recommender", "informer", "questioner"}:
     raise RuntimeError("PIXIE_BACKEND_TARGET must be either 'recommender', 'informer', or 'questioner'")
@@ -307,7 +320,7 @@ async def call_qa_backend(
     session_id: str,
     state: Dict[str, Any],
     history: List[str] | None,
-) -> Dict[str, Any]:
+) -> tuple[Dict[str, Any], str | None]:
     """Forward chat request to the QA backend `/chat` endpoint."""
     payload = {
         "session_id": session_id,
@@ -347,7 +360,26 @@ async def call_qa_backend(
             status_code=502, detail="Unexpected response format from Pixie Informer"
         )
 
-    return data
+    contract_version: str | None = None
+    if PIXIE_BACKEND_TARGET == "questioner":
+        contract_version = response.headers.get("X-Pixie-Chat-Contract")
+        if not contract_version:
+            detail = (
+                "Missing X-Pixie-Chat-Contract header from Pixie Questioner response."
+            )
+            if STRICT_QUESTIONER_CHAT_CONTRACT:
+                raise HTTPException(status_code=502, detail=detail)
+            logger.warning(detail)
+        elif contract_version != PIXIE_CHAT_CONTRACT_VERSION:
+            detail = (
+                "Unsupported Pixie Questioner chat contract version "
+                f"'{contract_version}', expected '{PIXIE_CHAT_CONTRACT_VERSION}'."
+            )
+            if STRICT_QUESTIONER_CHAT_CONTRACT:
+                raise HTTPException(status_code=502, detail=detail)
+            logger.warning(detail)
+
+    return data, contract_version
 
 
 def _normalize_chat_response(
@@ -392,7 +424,7 @@ def _normalize_chat_response(
 
 
 @app.post("/chat")
-async def chat(payload: ChatRequest) -> Dict[str, Any]:
+async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
     """Forward chat request to the configured Pixie backend for the active client."""
     current_answer = (payload.current_answer or payload.user_input or "").strip()
     if not current_answer:
@@ -409,7 +441,12 @@ async def chat(payload: ChatRequest) -> Dict[str, Any]:
             state=state,
             history=payload.history,
         )
-        return _normalize_chat_response(qa_response, session_id, state)
+        qa_data, contract_version = qa_response
+        if PIXIE_BACKEND_TARGET == "questioner":
+            response.headers["X-Pixie-Chat-Contract"] = (
+                contract_version or PIXIE_CHAT_CONTRACT_VERSION
+            )
+        return _normalize_chat_response(qa_data, session_id, state)
 
     has_session = bool(payload.session_id or payload.conversation_id)
     session_id = payload.session_id or payload.conversation_id or str(uuid4())
