@@ -352,12 +352,12 @@ async def call_qa_backend(
         data = response.json()
     except ValueError as exc:
         raise HTTPException(
-            status_code=502, detail="Invalid JSON received from Pixie Informer"
+            status_code=502, detail=f"Invalid JSON received from Pixie {PIXIE_BACKEND_TARGET}"
         ) from exc
 
     if not isinstance(data, dict):
         raise HTTPException(
-            status_code=502, detail="Unexpected response format from Pixie Informer"
+            status_code=502, detail=f"Unexpected response format from Pixie {PIXIE_BACKEND_TARGET}"
         )
 
     contract_version: str | None = None
@@ -442,10 +442,8 @@ async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
             history=payload.history,
         )
         qa_data, contract_version = qa_response
-        if PIXIE_BACKEND_TARGET == "questioner":
-            response.headers["X-Pixie-Chat-Contract"] = (
-                contract_version or PIXIE_CHAT_CONTRACT_VERSION
-            )
+        if PIXIE_BACKEND_TARGET == "questioner" and contract_version is not None:
+            response.headers["X-Pixie-Chat-Contract"] = contract_version
         return _normalize_chat_response(qa_data, session_id, state)
 
     has_session = bool(payload.session_id or payload.conversation_id)
