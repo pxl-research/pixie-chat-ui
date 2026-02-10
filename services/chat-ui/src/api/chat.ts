@@ -10,6 +10,8 @@ export type ChatApiResponse = {
   type?: string;
   text?: string | null;
   summary?: string | null;
+  follow_up_question?: string | null;
+  followUpQuestion?: string | null;
   conversation_id?: string | null;
   conversationId?: string | null;
   state?: Record<string, unknown> | null;

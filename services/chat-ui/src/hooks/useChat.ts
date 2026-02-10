@@ -94,28 +94,41 @@ export function useChat(initialAssistantMessage?: string) {
 
         const assistantContent = parsed.content?.trim() ?? "";
         const hasAssistantMessage = assistantContent.length > 0 || parsed.richContent;
+        const summaryContent = parsed.summaryContent;
+        const followUpQuestionContent = parsed.followUpQuestionContent;
+
+        const assistantMessages: ChatMessage[] = [];
 
         // Add assistant message to chat only if we have something to show
         if (hasAssistantMessage) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: ROLE_ASSISTANT,
-              content: assistantContent,
-              rich: parsed.richContent,
-            },
-          ]);
+          assistantMessages.push({
+            role: ROLE_ASSISTANT,
+            content: assistantContent,
+            rich: parsed.richContent,
+          });
         }
-        const summaryContent = parsed.summaryContent;
+
         if (summaryContent) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: ROLE_ASSISTANT,
-              content: summaryContent,
-              variant: parsed.messageVariant ?? "summary",
-            },
-          ]);
+          assistantMessages.push({
+            role: ROLE_ASSISTANT,
+            content: summaryContent,
+            variant: parsed.messageVariant ?? "summary",
+          });
+        }
+
+        if (
+          followUpQuestionContent &&
+          followUpQuestionContent !== assistantContent &&
+          followUpQuestionContent !== summaryContent
+        ) {
+          assistantMessages.push({
+            role: ROLE_ASSISTANT,
+            content: followUpQuestionContent,
+          });
+        }
+
+        if (assistantMessages.length > 0) {
+          setMessages((prev) => [...prev, ...assistantMessages]);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";

@@ -17,11 +17,27 @@ export type ParsedResponse = {
   conversationId: string | null;
   state: Record<string, unknown> | null;
   summaryContent: string | null;
+  followUpQuestionContent: string | null;
   shouldContinueConversation: boolean;
   messageVariant?: MessageVariant;
   error?: string;
   isComplete: boolean;
 };
+
+const DEFAULT_NO_ANSWER = "Geen antwoord beschikbaar.";
+
+function trimToNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isFeedbackComplete(state: Record<string, unknown> | null): boolean {
+  const feedbackRequested = state?.feedback_requested;
+  return feedbackRequested === "false" || feedbackRequested === false;
+}
 
 /**
  * Parse the API response and extract relevant data for the UI.
@@ -34,31 +50,30 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     data?.state && typeof data.state === "object" && !Array.isArray(data.state)
       ? data.state
       : null;
+  const textContent = trimToNonEmptyString(data?.text);
+  const summaryContent = trimToNonEmptyString(data?.summary);
+  const followUpQuestionContent = trimToNonEmptyString(
+    data?.follow_up_question ?? data?.followUpQuestion,
+  );
   
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
-  let summaryContent: string | null = null;
   let shouldContinueConversation = hasConversationId;
-  let messageVariant: MessageVariant | undefined;
+  const messageVariant: MessageVariant | undefined = summaryContent ? "summary" : undefined;
   let error: string | undefined;
   let isComplete = false;
 
   switch (responseType) {
     case RESPONSE_ASK_USER:
       // Backend is asking a follow-up question
-      content = data?.text ?? "Kun je wat meer details delen?";
+      content = textContent ?? "Kun je wat meer details delen?";
       shouldContinueConversation = true;
       break;
 
     case RESPONSE_SUMMARY:
-      content = data?.text ?? "Geen antwoord beschikbaar.";
-      if (typeof data?.summary === "string") {
-        const trimmedSummary = data.summary.trim();
-        summaryContent = trimmedSummary ? trimmedSummary : null;
-      }
-      messageVariant = summaryContent ? "summary" : undefined;
-      shouldContinueConversation = false;
-      isComplete = true;
+      content = textContent ?? DEFAULT_NO_ANSWER;
+      isComplete = isFeedbackComplete(state);
+      shouldContinueConversation = !isComplete && hasConversationId;
       break;
 
     case RESPONSE_ANSWER:
@@ -69,20 +84,15 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
         const parsed = tryParseSearchResults(data.text);
         if (parsed) {
           richContent = { type: SEARCH_RESULTS, results: parsed };
-          content = null;
-        } else {
-          content = data.text;
         }
-      } else {
-        content = data?.text ?? "Geen antwoord beschikbaar.";
       }
+      content = textContent ?? DEFAULT_NO_ANSWER;
       break;
 
     case RESPONSE_ERROR:
       content = data?.text ?? "Pixie backend gaf een foutmelding.";
       error = data?.text ?? "Pixie backend gaf een foutmelding.";
       shouldContinueConversation = false;
-      isComplete = true;
       break;
 
     default:
@@ -93,8 +103,8 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   }
 
   // Prevent empty assistant responses in the UI
-  if (!content && !richContent) {
-    content = "Geen antwoord beschikbaar.";
+  if (!content) {
+    content = DEFAULT_NO_ANSWER;
   }
 
   return {
@@ -103,6 +113,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     conversationId,
     state,
     summaryContent,
+    followUpQuestionContent,
     shouldContinueConversation,
     messageVariant,
     error,
