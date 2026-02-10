@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 
@@ -8,14 +8,25 @@ import { Landing } from "./components/Landing";
 import { type ClientConfig, fetchClientConfig } from "./config/client";
 import { useChat } from "./hooks/useChat";
 import { resolveOnPrimaryColor, resolvePrimaryColor } from "./utils/theme";
+import { buildStickyConversationState } from "./utils/urlContext";
 
 function App() {
+  const stickyConversationState = useMemo(
+    () =>
+      buildStickyConversationState(
+        typeof window !== "undefined" ? window.location.search : "",
+      ),
+    [],
+  );
   const [client, setClient] = useState<ClientConfig | null>(null);
   const [loadingClient, setLoadingClient] = useState(true);
   const [clientError, setClientError] = useState<string | null>(null);
   const [hasEnteredChat, setHasEnteredChat] = useState(false);
 
-  const { messages, loading, error, sendMessage, reset, isComplete } = useChat(client?.welcomeMessage);
+  const { messages, loading, error, sendMessage, reset, isComplete } = useChat(
+    client?.welcomeMessage,
+    stickyConversationState,
+  );
   const [sessionKey, setSessionKey] = useState(0);
 
   useEffect(() => {

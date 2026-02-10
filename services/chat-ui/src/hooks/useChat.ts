@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { sendChatMessage } from "../api/chat";
 import { parseApiResponse } from "../utils/responseParser";
@@ -27,17 +27,34 @@ const createSessionId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+function sanitizeConversationState(
+  value?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return { ...value };
+}
+
 /**
  * Hook for managing chat state and interactions.
  */
-export function useChat(initialAssistantMessage?: string) {
+export function useChat(
+  initialAssistantMessage?: string,
+  stickyConversationState?: Record<string, unknown>,
+) {
+  const sanitizedStickyState = useMemo(
+    () => sanitizeConversationState(stickyConversationState),
+    [stickyConversationState],
+  );
   const [messages, setMessages] = useState<ChatMessage[]>(
     initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : [],
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [conversationState, setConversationState] = useState<Record<string, unknown>>({});
+  const [conversationState, setConversationState] =
+    useState<Record<string, unknown>>(sanitizedStickyState);
   const [isComplete, setIsComplete] = useState(false);
 
 
@@ -49,9 +66,9 @@ export function useChat(initialAssistantMessage?: string) {
     setMessages(initialAssistantMessage ? [{ role: ROLE_ASSISTANT, content: initialAssistantMessage, rich: null }] : []);
     setError(null);
     setSessionId(null);
-    setConversationState({});
+    setConversationState(sanitizedStickyState);
     setIsComplete(false);
-  }, [initialAssistantMessage]);
+  }, [initialAssistantMessage, sanitizedStickyState]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -83,7 +100,10 @@ export function useChat(initialAssistantMessage?: string) {
         // Update conversation state
         setSessionId(parsed.conversationId ?? nextSessionId);
         if (parsed.state) {
-          setConversationState(parsed.state);
+          setConversationState({
+            ...parsed.state,
+            ...sanitizedStickyState,
+          });
         }
         setIsComplete(parsed.isComplete);
 
@@ -147,22 +167,22 @@ export function useChat(initialAssistantMessage?: string) {
         const message = err instanceof Error ? err.message : "Onbekende fout";
         setError(message);
         setSessionId(null);
-        setConversationState({});
+        setConversationState(sanitizedStickyState);
         setIsComplete(false);
       } finally {
         setLoading(false);
       }
     },
-    [conversationState, isComplete, sessionId],
+    [conversationState, isComplete, sanitizedStickyState, sessionId],
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
     setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
     setError(null);
     setSessionId(null);
-    setConversationState({});
+    setConversationState(sanitizedStickyState);
     setIsComplete(false);
-  }, []);
+  }, [sanitizedStickyState]);
 
   return {
     messages,

@@ -59,3 +59,17 @@ De UI toont eerst een landing page met een korte toelichting en een startknop. J
 - `LANDING_PRIVACY_NOTE` – tekst over privacy/GDPR en het ontbreken van persoonsgegevens.
 - `LANDING_START_LABEL` – label voor de hoofdknop (default: "Start assistent").
 - `LANDING_PRESETS` – optionele preset-knoppen, pipe-gescheiden. Formaat `Label` of `Label=prefill`. Voorbeeld: `LANDING_PRESETS=Man|Vrouw|Rode wijn=Ik zoek een rode wijn|Witte wijn=Ik zoek een frisse witte wijn`. Ontbreekt deze variabele, dan verschijnt alleen de hoofdknop.
+
+### Klantlocatie via URL-parameter
+
+De chat-UI ondersteunt optioneel een locatiecontext via query-parameter in de URL. Ondersteunde key:
+
+- `location`
+
+Voorbeeld:
+
+```
+http://localhost:3000/?location=Antwerpen
+```
+
+Wanneer aanwezig, stuurt de UI deze waarde mee in de chat `state` als `location` bij elke beurt in de conversatie.
