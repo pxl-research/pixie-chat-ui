@@ -124,7 +124,24 @@ export function useChat(initialAssistantMessage?: string) {
         }
 
         if (assistantMessages.length > 0) {
-          setMessages((prev) => [...prev, ...assistantMessages]);
+          setMessages((prev) => {
+            const nextMessages = [...prev];
+            for (const message of assistantMessages) {
+              if (message.variant === "summary") {
+                const alreadyShown = nextMessages.some(
+                  (existing) =>
+                    existing.role === ROLE_ASSISTANT &&
+                    existing.variant === "summary" &&
+                    existing.content.trim() === message.content.trim(),
+                );
+                if (alreadyShown) {
+                  continue;
+                }
+              }
+              nextMessages.push(message);
+            }
+            return nextMessages;
+          });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Onbekende fout";

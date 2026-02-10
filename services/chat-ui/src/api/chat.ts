@@ -62,7 +62,6 @@ export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiR
   if (contractHeader && contractHeader !== CHAT_CONTRACT_VERSION) {
     // Log detailed information for developers while keeping the user-facing error message generic.
     // This avoids exposing internal contract/version details directly in the UI.
-    // eslint-disable-next-line no-console
     console.error("Chat contract version mismatch", {
       expected: CHAT_CONTRACT_VERSION,
       received: contractHeader,
