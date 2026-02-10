@@ -39,6 +39,22 @@ function isFeedbackComplete(state: Record<string, unknown> | null): boolean {
   return feedbackRequested === "false" || feedbackRequested === false;
 }
 
+function extractFirstString(
+  source: Record<string, unknown> | null,
+  keys: readonly string[],
+): string | null {
+  if (!source) {
+    return null;
+  }
+  for (const key of keys) {
+    const value = trimToNonEmptyString(source[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
 /**
  * Parse the API response and extract relevant data for the UI.
  */
@@ -50,11 +66,31 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     data?.state && typeof data.state === "object" && !Array.isArray(data.state)
       ? data.state
       : null;
-  const textContent = trimToNonEmptyString(data?.text);
-  const summaryContent = trimToNonEmptyString(data?.summary);
-  const followUpQuestionContent = trimToNonEmptyString(
-    data?.follow_up_question ?? data?.followUpQuestion,
-  );
+  const dataObject =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+  const textContent = extractFirstString(dataObject, ["text", "answer", "prompt", "reason"]);
+  const summaryContent =
+    extractFirstString(dataObject, ["summary", "summary_text", "summaryText"]) ??
+    extractFirstString(state, ["summary", "summary_text", "summaryText"]);
+  const followUpQuestionContent =
+    extractFirstString(dataObject, [
+      "follow_up_question",
+      "followUpQuestion",
+      "next_question",
+      "nextQuestion",
+      "prompt",
+      "question",
+    ]) ??
+    extractFirstString(state, [
+      "follow_up_question",
+      "followUpQuestion",
+      "next_question",
+      "nextQuestion",
+      "prompt",
+      "question",
+    ]);
   
   let content: string | null = null;
   let richContent: AssistantRichContent | null = null;
@@ -90,14 +126,14 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
       break;
 
     case RESPONSE_ERROR:
-      content = data?.text ?? "Pixie backend gaf een foutmelding.";
-      error = data?.text ?? "Pixie backend gaf een foutmelding.";
+      content = textContent ?? "Pixie backend gaf een foutmelding.";
+      error = textContent ?? "Pixie backend gaf een foutmelding.";
       shouldContinueConversation = false;
       break;
 
     default:
       // Fallback for unknown response types
-      content = data?.text ?? null;
+      content = textContent ?? null;
       shouldContinueConversation = !!conversationId;
       break;
   }

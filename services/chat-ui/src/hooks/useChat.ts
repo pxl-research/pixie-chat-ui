@@ -116,11 +116,7 @@ export function useChat(initialAssistantMessage?: string) {
           });
         }
 
-        if (
-          followUpQuestionContent &&
-          followUpQuestionContent !== assistantContent &&
-          followUpQuestionContent !== summaryContent
-        ) {
+        if (followUpQuestionContent) {
           assistantMessages.push({
             role: ROLE_ASSISTANT,
             content: followUpQuestionContent,

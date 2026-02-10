@@ -73,6 +73,25 @@ def _extract_summary_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
+def _extract_follow_up_question(payload: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not payload:
+        return None
+    for key in (
+        "follow_up_question",
+        "followUpQuestion",
+        "next_question",
+        "nextQuestion",
+        "prompt",
+        "question",
+    ):
+        value = payload.get(key)
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                return text
+    return None
+
+
 CORS_ALLOW_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", DEFAULT_CORS_ALLOW_ORIGINS)
 ALLOWED_ORIGINS = _parse_origins(CORS_ALLOW_ORIGINS)
 
@@ -364,8 +383,11 @@ def _normalize_chat_response(
         "state": state,
     }
     summary_text = _extract_summary_text(data)
-    if response_type == "summary" and summary_text:
+    if summary_text:
         response["summary"] = summary_text
+    follow_up_question = _extract_follow_up_question(data)
+    if follow_up_question:
+        response["follow_up_question"] = follow_up_question
     return response
 
 
