@@ -82,5 +82,5 @@ Gedrag:
 
 - matching is case-insensitive;
 - de proxy normaliseert de `location`-waarde naar de geconfigureerde schrijfwijze;
-- als `location` niet in de allowlist zit, weigert `/chat` de request met `400`.
-- de UI blokkeert ook meteen bij opstart als `?location=` niet in de allowlist zit.
+- als `location` ontbreekt of niet in de allowlist zit, weigert `/chat` de request met `400`;
+- de UI blokkeert ook meteen bij opstart als `?location=` ontbreekt of ongeldig is.

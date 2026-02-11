@@ -103,10 +103,14 @@ def _normalize_state_location(
 ) -> Dict[str, Any]:
     normalized_state = dict(state)
     if "location" not in normalized_state:
+        if strict and ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP:
+            raise HTTPException(status_code=400, detail="Missing location.")
         return normalized_state
 
     normalized_location = _normalize_location_value(normalized_state.get("location"))
     if normalized_location is None:
+        if strict and ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP:
+            raise HTTPException(status_code=400, detail="Missing location.")
         normalized_state.pop("location", None)
         return normalized_state
 

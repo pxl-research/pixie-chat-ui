@@ -11,8 +11,7 @@ import { resolveOnPrimaryColor, resolvePrimaryColor } from "./utils/theme";
 import { buildStickyConversationState, resolveCustomerLocation } from "./utils/urlContext";
 
 type InvalidLocationState = {
-  location: string;
-  allowedLocations: string[];
+  reason: "missing" | "invalid";
 };
 
 function App() {
@@ -47,24 +46,30 @@ function App() {
       try {
         const config = await fetchClientConfig();
         setClient(config);
-        if (locationFromUrl && Array.isArray(config.allowedLocations) && config.allowedLocations.length > 0) {
-          const normalizedAllowedLocations = config.allowedLocations
-            .filter((value): value is string => typeof value === "string")
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0);
-          if (normalizedAllowedLocations.length > 0) {
-            const isAllowed = normalizedAllowedLocations.some(
-              (allowedLocation) => allowedLocation.toLowerCase() === locationFromUrl.toLowerCase(),
-            );
-            if (!isAllowed) {
-              setInvalidLocation({
-                location: locationFromUrl,
-                allowedLocations: normalizedAllowedLocations,
-              });
-              return;
-            }
+
+        const normalizedAllowedLocations = Array.isArray(config.allowedLocations)
+          ? config.allowedLocations
+              .filter((value): value is string => typeof value === "string")
+              .map((value) => value.trim())
+              .filter((value) => value.length > 0)
+          : [];
+
+        if (normalizedAllowedLocations.length > 0) {
+          if (!locationFromUrl) {
+            setInvalidLocation({ reason: "missing" });
+            return;
+          }
+
+          const isAllowed = normalizedAllowedLocations.some(
+            (allowedLocation) => allowedLocation.toLowerCase() === locationFromUrl.toLowerCase(),
+          );
+
+          if (!isAllowed) {
+            setInvalidLocation({ reason: "invalid" });
+            return;
           }
         }
+
         setInvalidLocation(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unexpected error";
@@ -131,24 +136,22 @@ function App() {
   if (invalidLocation) {
     return (
       <div className={appClassName} style={{ ...backgroundStyle, ...themeStyle }}>
-        <Header
-          displayName={client.displayName}
-          theme={client.theme}
-          disableActions
-        />
+        <Header displayName={client.displayName} theme={client.theme} disableActions />
         <main>
           <section className="landing" aria-live="polite">
             <div className="landing__panel">
               <p className="landing__eyebrow">Ongeldige Locatie</p>
-              <h1 className="landing__title">Deze link bevat een ongeldige locatie.</h1>
+              <h1 className="landing__title">Deze chatlink is ongeldig.</h1>
               <div className="landing__notes">
                 <div className="landing__note">
                   <p>
-                    Locatie in de URL: <strong>{invalidLocation.location}</strong>
+                    {invalidLocation.reason === "missing"
+                      ? "De locatieparameter ontbreekt in de URL."
+                      : "De locatieparameter in de URL is ongeldig."}
                   </p>
                 </div>
                 <div className="landing__note">
-                  <p>Toegelaten locaties: {invalidLocation.allowedLocations.join(", ")}</p>
+                  <p>Gebruik de originele link of vraag een geldige chatlink op.</p>
                 </div>
               </div>
             </div>
