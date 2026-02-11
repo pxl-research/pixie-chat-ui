@@ -116,13 +116,9 @@ def _normalize_state_location(
         )
         if allowed_location is None:
             if strict:
-                allowed_values = ", ".join(ACTIVE_CLIENT_ALLOWED_LOCATIONS)
                 raise HTTPException(
                     status_code=400,
-                    detail=(
-                        f"Invalid location '{normalized_location}'. "
-                        f"Allowed values: {allowed_values}"
-                    ),
+                    detail="Invalid location.",
                 )
             normalized_state.pop("location", None)
             return normalized_state

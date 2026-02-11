@@ -10,6 +10,11 @@ import { useChat } from "./hooks/useChat";
 import { resolveOnPrimaryColor, resolvePrimaryColor } from "./utils/theme";
 import { buildStickyConversationState, resolveCustomerLocation } from "./utils/urlContext";
 
+type InvalidLocationState = {
+  location: string;
+  allowedLocations: string[];
+};
+
 function App() {
   const locationFromUrl = useMemo(
     () =>
@@ -28,6 +33,7 @@ function App() {
   const [client, setClient] = useState<ClientConfig | null>(null);
   const [loadingClient, setLoadingClient] = useState(true);
   const [clientError, setClientError] = useState<string | null>(null);
+  const [invalidLocation, setInvalidLocation] = useState<InvalidLocationState | null>(null);
   const [hasEnteredChat, setHasEnteredChat] = useState(false);
 
   const { messages, loading, error, sendMessage, reset, isComplete } = useChat(
@@ -40,21 +46,26 @@ function App() {
     async function loadClient() {
       try {
         const config = await fetchClientConfig();
+        setClient(config);
         if (locationFromUrl && Array.isArray(config.allowedLocations) && config.allowedLocations.length > 0) {
           const normalizedAllowedLocations = config.allowedLocations
             .filter((value): value is string => typeof value === "string")
             .map((value) => value.trim())
             .filter((value) => value.length > 0);
-          const isAllowed = normalizedAllowedLocations.some(
-            (allowedLocation) => allowedLocation.toLowerCase() === locationFromUrl.toLowerCase(),
-          );
-          if (!isAllowed) {
-            throw new Error(
-              `Ongeldige location '${locationFromUrl}'. Toegelaten locaties: ${normalizedAllowedLocations.join(", ")}`,
+          if (normalizedAllowedLocations.length > 0) {
+            const isAllowed = normalizedAllowedLocations.some(
+              (allowedLocation) => allowedLocation.toLowerCase() === locationFromUrl.toLowerCase(),
             );
+            if (!isAllowed) {
+              setInvalidLocation({
+                location: locationFromUrl,
+                allowedLocations: normalizedAllowedLocations,
+              });
+              return;
+            }
           }
         }
-        setClient(config);
+        setInvalidLocation(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unexpected error";
         setClientError(message);
@@ -116,6 +127,36 @@ function App() {
   const chatHeaderLogoUrl = client.chatHeader?.logoUrl?.trim() || client.theme.logoUrl;
 
   const appClassName = `app ${hasEnteredChat ? "app--chat" : "app--landing"}`;
+
+  if (invalidLocation) {
+    return (
+      <div className={appClassName} style={{ ...backgroundStyle, ...themeStyle }}>
+        <Header
+          displayName={client.displayName}
+          theme={client.theme}
+          disableActions
+        />
+        <main>
+          <section className="landing" aria-live="polite">
+            <div className="landing__panel">
+              <p className="landing__eyebrow">Ongeldige Locatie</p>
+              <h1 className="landing__title">Deze link bevat een ongeldige locatie.</h1>
+              <div className="landing__notes">
+                <div className="landing__note">
+                  <p>
+                    Locatie in de URL: <strong>{invalidLocation.location}</strong>
+                  </p>
+                </div>
+                <div className="landing__note">
+                  <p>Toegelaten locaties: {invalidLocation.allowedLocations.join(", ")}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className={appClassName} style={{ ...backgroundStyle, ...themeStyle }}>
