@@ -28,6 +28,7 @@ export type ClientConfig = {
   theme: ClientTheme;
   chatHeader?: ChatHeaderConfig;
   welcomeMessage?: string;
+  allowedLocations?: string[];
   landing: LandingConfig;
 };
 

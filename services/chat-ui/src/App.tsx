@@ -8,9 +8,16 @@ import { Landing } from "./components/Landing";
 import { type ClientConfig, fetchClientConfig } from "./config/client";
 import { useChat } from "./hooks/useChat";
 import { resolveOnPrimaryColor, resolvePrimaryColor } from "./utils/theme";
-import { buildStickyConversationState } from "./utils/urlContext";
+import { buildStickyConversationState, resolveCustomerLocation } from "./utils/urlContext";
 
 function App() {
+  const locationFromUrl = useMemo(
+    () =>
+      resolveCustomerLocation(
+        typeof window !== "undefined" ? window.location.search : "",
+      ),
+    [],
+  );
   const stickyConversationState = useMemo(
     () =>
       buildStickyConversationState(
@@ -33,6 +40,20 @@ function App() {
     async function loadClient() {
       try {
         const config = await fetchClientConfig();
+        if (locationFromUrl && Array.isArray(config.allowedLocations) && config.allowedLocations.length > 0) {
+          const normalizedAllowedLocations = config.allowedLocations
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+          const isAllowed = normalizedAllowedLocations.some(
+            (allowedLocation) => allowedLocation.toLowerCase() === locationFromUrl.toLowerCase(),
+          );
+          if (!isAllowed) {
+            throw new Error(
+              `Ongeldige location '${locationFromUrl}'. Toegelaten locaties: ${normalizedAllowedLocations.join(", ")}`,
+            );
+          }
+        }
         setClient(config);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unexpected error";
@@ -43,7 +64,7 @@ function App() {
     }
 
     loadClient();
-  }, []);
+  }, [locationFromUrl]);
 
   const handleNewConversation = useCallback(() => {
     reset(client?.welcomeMessage);
