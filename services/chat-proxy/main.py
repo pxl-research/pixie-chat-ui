@@ -15,7 +15,7 @@ app = FastAPI()
 
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
-DEFAULT_CHAT_CONTRACT_VERSION = "chat-v1.0.0"
+DEFAULT_CHAT_CONTRACT_VERSION = "chat-v1.1.0"
 DEFAULT_LANDING_TITLE = "Welkom bij onze AI-assistent"
 DEFAULT_LANDING_RESEARCH_NOTE = (
     "Deze AI-assistent maakt deel uit van een TETRA-onderzoeksproject. De antwoorden zijn experimenteel en kunnen onvolledig of onjuist zijn."
@@ -160,6 +160,78 @@ def _extract_follow_up_question(payload: Optional[Dict[str, Any]]) -> Optional[s
             text = value.strip()
             if text:
                 return text
+    return None
+
+
+def _normalize_quick_reply_text(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split())
+    if not normalized:
+        return None
+    return normalized
+
+
+def _normalize_quick_reply_options(raw_options: Any) -> Optional[List[Dict[str, str]]]:
+    if not isinstance(raw_options, list):
+        return None
+
+    normalized_options: List[Dict[str, str]] = []
+    seen_values: set[str] = set()
+
+    for item in raw_options:
+        label: Optional[str]
+        value: Optional[str]
+
+        if isinstance(item, str):
+            label = _normalize_quick_reply_text(item)
+            value = label
+        elif isinstance(item, dict):
+            label = _normalize_quick_reply_text(item.get("label"))
+            if label is None:
+                label = _normalize_quick_reply_text(item.get("text"))
+            value = _normalize_quick_reply_text(item.get("value"))
+            if value is None:
+                value = label
+        else:
+            continue
+
+        if label is None or value is None:
+            continue
+
+        dedupe_key = value.casefold()
+        if dedupe_key in seen_values:
+            continue
+
+        seen_values.add(dedupe_key)
+        normalized_options.append({"label": label, "value": value})
+
+        if len(normalized_options) >= 6:
+            break
+
+    if not normalized_options:
+        return None
+    return normalized_options
+
+
+def _normalize_quick_replies(
+    payload: Optional[Dict[str, Any]],
+    state: Optional[Dict[str, Any]],
+) -> Optional[List[Dict[str, str]]]:
+    keys = (
+        "quick_replies",
+        "quickReplies",
+        "choices",
+        "options",
+        "suggested_answers",
+    )
+    for source in (payload, state):
+        if not source:
+            continue
+        for key in keys:
+            normalized = _normalize_quick_reply_options(source.get(key))
+            if normalized:
+                return normalized
     return None
 
 
@@ -495,6 +567,9 @@ def _normalize_chat_response(
     follow_up_question = _extract_follow_up_question(data)
     if follow_up_question:
         response["follow_up_question"] = follow_up_question
+    quick_replies = _normalize_quick_replies(data, state)
+    if response["type"] == "answer" and quick_replies:
+        response["quick_replies"] = quick_replies
     return response
 
 

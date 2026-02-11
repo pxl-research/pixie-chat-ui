@@ -37,6 +37,10 @@ export interface components {
             current_answer: string;
             state: components["schemas"]["OpaqueStateMap"];
         };
+        QuickReplyOption: {
+            label: string;
+            value: string;
+        };
         ChatAnswerResponse: {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -46,6 +50,7 @@ export interface components {
             text: string;
             summary?: string | null;
             follow_up_question?: string | null;
+            quick_replies?: components["schemas"]["QuickReplyOption"][];
             conversation_id: string;
             state: components["schemas"]["OpaqueStateMap"];
         };
