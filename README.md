@@ -73,3 +73,13 @@ http://localhost:3000/?location=Antwerpen
 ```
 
 Wanneer aanwezig, stuurt de UI deze waarde mee in de chat `state` als `location` bij elke beurt in de conversatie.
+
+Om locatie te beperken tot een vaste lijst, configureer in de proxy:
+
+- `ACTIVE_CLIENT_ALLOWED_LOCATIONS=Antwerpen|Gent|Hasselt`
+
+Gedrag:
+
+- matching is case-insensitive;
+- de proxy normaliseert de `location`-waarde naar de geconfigureerde schrijfwijze;
+- als `location` niet in de allowlist zit, weigert `/chat` de request met `400`.

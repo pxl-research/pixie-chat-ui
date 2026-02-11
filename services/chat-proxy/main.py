@@ -23,6 +23,7 @@ DEFAULT_LANDING_RESEARCH_NOTE = (
 DEFAULT_LANDING_PRIVACY_NOTE = (
     "We vragen of bewaren geen persoonsgegevens. Anonieme gebruiksgegevens worden verzameld om het onderzoek te verbeteren, met respect voor de GDPR-richtlijnen."
 )
+MAX_LOCATION_LENGTH = 120
 
 
 def _parse_bool(raw: str, default: bool = False) -> bool:
@@ -66,6 +67,69 @@ def _parse_landing_presets(raw: str) -> list[dict[str, str]]:
             continue
         presets.append({"label": label, "prefill": prefill or label})
     return presets
+
+
+def _normalize_location_value(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split())
+    if not normalized:
+        return None
+    if len(normalized) > MAX_LOCATION_LENGTH:
+        return normalized[:MAX_LOCATION_LENGTH]
+    return normalized
+
+
+def _parse_allowed_locations(raw: str) -> list[str]:
+    normalized_raw = raw.replace("|", ",")
+    allowed: list[str] = []
+    seen: set[str] = set()
+    for token in normalized_raw.split(","):
+        normalized = _normalize_location_value(token)
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        allowed.append(normalized)
+    return allowed
+
+
+def _normalize_state_location(
+    state: Dict[str, Any],
+    *,
+    strict: bool,
+) -> Dict[str, Any]:
+    normalized_state = dict(state)
+    if "location" not in normalized_state:
+        return normalized_state
+
+    normalized_location = _normalize_location_value(normalized_state.get("location"))
+    if normalized_location is None:
+        normalized_state.pop("location", None)
+        return normalized_state
+
+    if ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP:
+        allowed_location = ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP.get(
+            normalized_location.casefold()
+        )
+        if allowed_location is None:
+            if strict:
+                allowed_values = ", ".join(ACTIVE_CLIENT_ALLOWED_LOCATIONS)
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Invalid location '{normalized_location}'. "
+                        f"Allowed values: {allowed_values}"
+                    ),
+                )
+            normalized_state.pop("location", None)
+            return normalized_state
+        normalized_location = allowed_location
+
+    normalized_state["location"] = normalized_location
+    return normalized_state
 
 
 def _extract_summary_text(payload: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -130,6 +194,13 @@ if not _client_id:
     raise RuntimeError("ACTIVE_CLIENT_ID environment variable is required")
 ACTIVE_CLIENT_ID: str = _client_id
 
+ACTIVE_CLIENT_ALLOWED_LOCATIONS = _parse_allowed_locations(
+    os.environ.get("ACTIVE_CLIENT_ALLOWED_LOCATIONS", "")
+)
+ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP = {
+    location.casefold(): location for location in ACTIVE_CLIENT_ALLOWED_LOCATIONS
+}
+
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
 BACKEND_BASE_URLS: Dict[str, str] = {
     "recommender": PIXIE_CORE_API_BASE_URL,
@@ -183,6 +254,9 @@ def build_client_payload() -> Dict[str, Any]:
 
     if chat_header:
         payload["chatHeader"] = chat_header
+
+    if ACTIVE_CLIENT_ALLOWED_LOCATIONS:
+        payload["allowedLocations"] = ACTIVE_CLIENT_ALLOWED_LOCATIONS
 
     return payload
 
@@ -405,6 +479,7 @@ def _normalize_chat_response(
     state = data.get("state")
     if not isinstance(state, dict):
         state = fallback_state
+    state = _normalize_state_location(state, strict=False)
 
     response: Dict[str, Any] = {
         "type": response_type or "answer",
@@ -434,7 +509,8 @@ async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
 
     if PIXIE_BACKEND_TARGET in {"informer", "questioner"}:
         session_id = payload.session_id or payload.conversation_id or str(uuid4())
-        state = payload.state if isinstance(payload.state, dict) else {}
+        request_state = payload.state if isinstance(payload.state, dict) else {}
+        state = _normalize_state_location(request_state, strict=True)
         qa_response = await call_qa_backend(
             current_answer=current_answer,
             session_id=session_id,
@@ -448,7 +524,8 @@ async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
 
     has_session = bool(payload.session_id or payload.conversation_id)
     session_id = payload.session_id or payload.conversation_id or str(uuid4())
-    state = payload.state if isinstance(payload.state, dict) else {}
+    request_state = payload.state if isinstance(payload.state, dict) else {}
+    state = _normalize_state_location(request_state, strict=True)
     if has_session:
         pixie_payload = {"conversation_id": session_id, "message": current_answer}
     else:
