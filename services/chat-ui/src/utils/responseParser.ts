@@ -1,5 +1,9 @@
 import type { ChatApiResponse } from "../api/chat";
-import type { SearchResultsResponse, AssistantRichContent } from "../types";
+import type {
+  SearchResultsResponse,
+  AssistantRichContent,
+  QuickReplyOption,
+} from "../types";
 import {
   RESPONSE_ASK_USER,
   RESPONSE_ANSWER,
@@ -22,6 +26,7 @@ export type ParsedResponse = {
   messageVariant?: MessageVariant;
   error?: string;
   isComplete: boolean;
+  quickReplies: QuickReplyOption[];
 };
 
 const DEFAULT_NO_ANSWER = "Geen antwoord beschikbaar.";
@@ -32,6 +37,14 @@ function trimToNonEmptyString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function normalizeQuickReplyText(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized.length > 0 ? normalized : null;
 }
 
 function isFeedbackComplete(state: Record<string, unknown> | null): boolean {
@@ -61,6 +74,73 @@ function extractFirstString(
     }
   }
   return null;
+}
+
+function normalizeQuickReplyArray(raw: unknown): QuickReplyOption[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const normalized: QuickReplyOption[] = [];
+  const seenValues = new Set<string>();
+
+  for (const item of raw) {
+    let label: string | null = null;
+    let value: string | null = null;
+
+    if (typeof item === "string") {
+      label = normalizeQuickReplyText(item);
+      value = label;
+    } else if (item && typeof item === "object" && !Array.isArray(item)) {
+      const option = item as Record<string, unknown>;
+      label = normalizeQuickReplyText(option.label) ?? normalizeQuickReplyText(option.text);
+      value = normalizeQuickReplyText(option.value) ?? label;
+    }
+
+    if (!label || !value) {
+      continue;
+    }
+
+    const dedupeKey = value.toLowerCase();
+    if (seenValues.has(dedupeKey)) {
+      continue;
+    }
+    seenValues.add(dedupeKey);
+    normalized.push({ label, value });
+
+    if (normalized.length >= 6) {
+      break;
+    }
+  }
+
+  return normalized;
+}
+
+function extractQuickReplies(
+  dataObject: Record<string, unknown> | null,
+  state: Record<string, unknown> | null,
+): QuickReplyOption[] {
+  const keys = [
+    "quick_replies",
+    "quickReplies",
+    "choices",
+    "options",
+    "suggested_answers",
+  ] as const;
+
+  for (const source of [dataObject, state]) {
+    if (!source) {
+      continue;
+    }
+    for (const key of keys) {
+      const parsed = normalizeQuickReplyArray(source[key]);
+      if (parsed.length > 0) {
+        return parsed;
+      }
+    }
+  }
+
+  return [];
 }
 
 /**
@@ -109,6 +189,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
   const messageVariant: MessageVariant | undefined = summaryContent ? "summary" : undefined;
   let error: string | undefined;
   let isComplete = false;
+  let quickReplies: QuickReplyOption[] = [];
 
   switch (responseType) {
     case RESPONSE_ASK_USER:
@@ -154,6 +235,10 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     content = DEFAULT_NO_ANSWER;
   }
 
+  if (!isComplete && responseType !== RESPONSE_SUMMARY && responseType !== RESPONSE_ERROR) {
+    quickReplies = extractQuickReplies(dataObject, state);
+  }
+
   return {
     content,
     richContent,
@@ -165,6 +250,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
     messageVariant,
     error,
     isComplete,
+    quickReplies,
   };
 }
 
@@ -175,7 +261,7 @@ export function parseApiResponse(data: ChatApiResponse): ParsedResponse {
 function tryParseSearchResults(text: string): SearchResultsResponse | null {
   try {
     const parsed = JSON.parse(text) as SearchResultsResponse | null;
-    
+
     // Validate it looks like search results
     if (parsed && typeof parsed === "object" && Array.isArray(parsed.items) && parsed.items.length > 0) {
       return parsed;
@@ -183,6 +269,6 @@ function tryParseSearchResults(text: string): SearchResultsResponse | null {
   } catch {
     // Not valid JSON or not search results
   }
-  
+
   return null;
 }

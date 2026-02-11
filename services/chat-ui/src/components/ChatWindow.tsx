@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import type { FormEvent } from "react";
 
 import { ROLE_USER, SEARCH_RESULTS } from "../constants";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, QuickReplyOption } from "../types";
 import { SearchResultsCarousel } from "./SearchResultsCarousel";
 
 type ChatWindowProps = {
@@ -13,6 +13,8 @@ type ChatWindowProps = {
   headerTitle: string;
   headerLogoUrl?: string;
   onSend: (content: string) => Promise<void> | void;
+  onQuickReplySelect: (value: string) => Promise<void> | void;
+  quickReplies: QuickReplyOption[];
   loading: boolean;
   error: string | null;
   isComplete?: boolean;
@@ -23,6 +25,8 @@ export function ChatWindow({
   headerTitle,
   headerLogoUrl,
   onSend,
+  onQuickReplySelect,
+  quickReplies,
   loading,
   error,
   isComplete = false,
@@ -101,7 +105,7 @@ export function ChatWindow({
           onScroll={handleMessagesScroll}
         >
           {messages.length === 0 ? (
-            <div className="empty-state">Start the conversation by saying hello.</div>
+            <div className="empty-state">Start het gesprek door hallo te zeggen.</div>
           ) : (
             <>
               {messages.map((message, index) => (
@@ -159,6 +163,22 @@ export function ChatWindow({
         </div>
       ) : null}
 
+      {!isComplete && quickReplies.length > 0 ? (
+        <div className="quick-replies" aria-label="Snelle antwoordopties">
+          {quickReplies.map((reply) => (
+            <button
+              key={`${reply.value}-${reply.label}`}
+              type="button"
+              className="quick-replies__option"
+              onClick={() => onQuickReplySelect(reply.value)}
+              disabled={loading}
+            >
+              {reply.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <form className="composer" onSubmit={handleSubmit}>
         <input
           ref={inputRef}
@@ -168,8 +188,8 @@ export function ChatWindow({
             isComplete
               ? "Gesprek afgerond."
               : loading
-                ? "Waiting for response..."
-                : "Type your message"
+                ? "Wachten op antwoord..."
+                : "Typ je bericht"
           }
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -180,7 +200,7 @@ export function ChatWindow({
           className="composer__send"
           disabled={loading || isComplete || draft.trim().length === 0}
         >
-          {loading ? "Sending..." : "Send"}
+          {loading ? "Verzenden..." : "Versturen"}
         </button>
       </form>
     </div>

@@ -7,12 +7,25 @@ export type ChatApiRequest = {
   state: Record<string, unknown>;
 };
 
+export type ChatApiQuickReply =
+  | string
+  | {
+      label?: string | null;
+      value?: string | null;
+      text?: string | null;
+    };
+
 export type ChatApiResponse = {
   type?: string;
   text?: string | null;
   summary?: string | null;
   follow_up_question?: string | null;
   followUpQuestion?: string | null;
+  quick_replies?: ChatApiQuickReply[] | null;
+  quickReplies?: ChatApiQuickReply[] | null;
+  choices?: ChatApiQuickReply[] | null;
+  options?: ChatApiQuickReply[] | null;
+  suggested_answers?: ChatApiQuickReply[] | null;
   conversation_id?: string | null;
   conversationId?: string | null;
   state?: Record<string, unknown> | null;
@@ -43,7 +56,7 @@ export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiR
   if (!response.ok) {
     const detailText = await response.text();
     let detailMessage = detailText;
-    
+
     try {
       const parsed = JSON.parse(detailText);
       if (typeof parsed === "string") {
@@ -54,7 +67,7 @@ export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiR
     } catch {
       // Keep detailMessage as-is when JSON parsing fails
     }
-    
+
     throw new Error(detailMessage || `Request failed with status ${response.status}`);
   }
 

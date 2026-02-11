@@ -3,7 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { sendChatMessage } from "../api/chat";
 import { parseApiResponse } from "../utils/responseParser";
 import { ROLE_USER, ROLE_ASSISTANT } from "../constants";
-import type { AssistantRichContent, ChatMessage as ChatMessageType, SearchResultAttribute, SearchResultItem, SearchResultsResponse } from "../types";
+import type {
+  AssistantRichContent,
+  ChatMessage as ChatMessageType,
+  QuickReplyOption,
+  SearchResultAttribute,
+  SearchResultItem,
+  SearchResultsResponse,
+} from "../types";
 
 export type ChatMessage = ChatMessageType & { rich?: AssistantRichContent | null };
 
@@ -56,7 +63,7 @@ export function useChat(
   const [conversationState, setConversationState] =
     useState<Record<string, unknown>>(sanitizedStickyState);
   const [isComplete, setIsComplete] = useState(false);
-
+  const [activeQuickReplies, setActiveQuickReplies] = useState<QuickReplyOption[]>([]);
 
   // Reset when initial message changes
   useEffect(() => {
@@ -68,6 +75,7 @@ export function useChat(
     setSessionId(null);
     setConversationState(sanitizedStickyState);
     setIsComplete(false);
+    setActiveQuickReplies([]);
   }, [initialAssistantMessage, sanitizedStickyState]);
 
   const sendMessage = useCallback(
@@ -84,6 +92,7 @@ export function useChat(
       setMessages((prev) => [...prev, { role: ROLE_USER, content: trimmed }]);
       setLoading(true);
       setError(null);
+      setActiveQuickReplies([]);
 
       try {
         const nextSessionId = sessionId ?? createSessionId();
@@ -106,6 +115,7 @@ export function useChat(
           });
         }
         setIsComplete(parsed.isComplete);
+        setActiveQuickReplies(parsed.isComplete ? [] : parsed.quickReplies);
 
         // Update error state if needed
         if (parsed.error) {
@@ -169,6 +179,7 @@ export function useChat(
         setSessionId(null);
         setConversationState(sanitizedStickyState);
         setIsComplete(false);
+        setActiveQuickReplies([]);
       } finally {
         setLoading(false);
       }
@@ -182,6 +193,7 @@ export function useChat(
     setSessionId(null);
     setConversationState(sanitizedStickyState);
     setIsComplete(false);
+    setActiveQuickReplies([]);
   }, [sanitizedStickyState]);
 
   return {
@@ -191,5 +203,6 @@ export function useChat(
     sendMessage,
     reset,
     isComplete,
+    activeQuickReplies,
   };
 }

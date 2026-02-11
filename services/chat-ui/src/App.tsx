@@ -35,7 +35,15 @@ function App() {
   const [invalidLocation, setInvalidLocation] = useState<InvalidLocationState | null>(null);
   const [hasEnteredChat, setHasEnteredChat] = useState(false);
 
-  const { messages, loading, error, sendMessage, reset, isComplete } = useChat(
+  const {
+    messages,
+    loading,
+    error,
+    sendMessage,
+    reset,
+    isComplete,
+    activeQuickReplies,
+  } = useChat(
     client?.welcomeMessage,
     stickyConversationState,
   );
@@ -72,7 +80,7 @@ function App() {
 
         setInvalidLocation(null);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unexpected error";
+        const message = err instanceof Error ? err.message : "Onverwachte fout";
         setClientError(message);
       } finally {
         setLoadingClient(false);
@@ -99,13 +107,13 @@ function App() {
   );
 
   if (loadingClient) {
-    return <div className="app app-centered">Loading chat experience...</div>;
+    return <div className="app app-centered">Chatervaring laden...</div>;
   }
 
   if (clientError || !client) {
     return (
       <div className="app app-centered">
-        Unable to load client configuration.
+        Chatconfiguratie laden mislukt.
         {clientError ? <p className="error">{clientError}</p> : null}
       </div>
     );
@@ -177,6 +185,8 @@ function App() {
             headerTitle={chatHeaderTitle}
             headerLogoUrl={chatHeaderLogoUrl}
             onSend={sendMessage}
+            onQuickReplySelect={sendMessage}
+            quickReplies={activeQuickReplies}
             loading={loading}
             error={error}
             isComplete={isComplete}

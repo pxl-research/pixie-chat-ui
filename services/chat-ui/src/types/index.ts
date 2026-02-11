@@ -4,6 +4,11 @@ export type ChatRole = Role;
 
 export type MessageVariant = "summary";
 
+export type QuickReplyOption = {
+  label: string;
+  value: string;
+};
+
 export type ChatMessage = {
   role: ChatRole;
   content: string;
