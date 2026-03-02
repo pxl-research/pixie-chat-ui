@@ -34,6 +34,11 @@ const createSessionId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+type UseChatOptions = {
+  debugModeEnabled?: boolean;
+  showDebugMessages?: boolean;
+};
+
 function sanitizeConversationState(
   value?: Record<string, unknown> | null,
 ): Record<string, unknown> {
@@ -43,13 +48,96 @@ function sanitizeConversationState(
   return { ...value };
 }
 
+function sanitizeStateForRequest(
+  value: Record<string, unknown>,
+  debugModeEnabled: boolean,
+): Record<string, unknown> {
+  const sanitized = { ...value };
+  if (debugModeEnabled) {
+    sanitized.debug_mode = true;
+    return sanitized;
+  }
+  delete sanitized.debug_mode;
+  delete sanitized.debug;
+  return sanitized;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function buildDebugMessage(state: Record<string, unknown> | null): string | null {
+  if (!state) {
+    return null;
+  }
+  const debug = state.debug;
+  if (!debug || typeof debug !== "object" || Array.isArray(debug)) {
+    return null;
+  }
+  const debugRecord = debug as Record<string, unknown>;
+  if (debugRecord.enabled !== true) {
+    return null;
+  }
+  const rawTrace = debugRecord.trace;
+  if (!Array.isArray(rawTrace) || rawTrace.length === 0) {
+    return null;
+  }
+  const lastEvent = rawTrace[rawTrace.length - 1];
+  if (!lastEvent || typeof lastEvent !== "object" || Array.isArray(lastEvent)) {
+    return null;
+  }
+
+  const event = lastEvent as Record<string, unknown>;
+  const turn = typeof event.turn === "number" ? event.turn : null;
+  const action = typeof event.action === "string" ? event.action : "";
+  const mealMode = typeof event.meal_mode === "string" ? event.meal_mode : "";
+  const controllerExplanation =
+    typeof event.controller_explanation === "string" ? event.controller_explanation : "";
+  const questionText = typeof event.question_text === "string" ? event.question_text : "";
+  const rankerExplanation =
+    typeof event.ranker_explanation === "string" ? event.ranker_explanation : "";
+  const selectedBarcodes = toStringArray(event.selected_barcodes);
+
+  const lines: string[] = [];
+  const headerParts: string[] = [];
+  if (turn !== null) {
+    headerParts.push(`turn ${turn}`);
+  }
+  if (action) {
+    headerParts.push(`actie ${action}`);
+  }
+  if (mealMode) {
+    headerParts.push(`mode ${mealMode}`);
+  }
+  lines.push(`**Debug**${headerParts.length > 0 ? ` (${headerParts.join(", ")})` : ""}`);
+  if (controllerExplanation) {
+    lines.push(`Controller: ${controllerExplanation}`);
+  }
+  if (questionText) {
+    lines.push(`Vraag: ${questionText}`);
+  }
+  if (selectedBarcodes.length > 0) {
+    lines.push(`Selectie: ${selectedBarcodes.join(", ")}`);
+  }
+  if (rankerExplanation) {
+    lines.push(`Ranker: ${rankerExplanation}`);
+  }
+  return lines.length > 1 ? lines.join("\n") : null;
+}
+
 /**
  * Hook for managing chat state and interactions.
  */
 export function useChat(
   initialAssistantMessage?: string,
   stickyConversationState?: Record<string, unknown>,
+  options?: UseChatOptions,
 ) {
+  const debugModeEnabled = options?.debugModeEnabled === true;
+  const showDebugMessages = options?.showDebugMessages !== false;
   const sanitizedStickyState = useMemo(
     () => sanitizeConversationState(stickyConversationState),
     [stickyConversationState],
@@ -61,7 +149,9 @@ export function useChat(
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [conversationState, setConversationState] =
-    useState<Record<string, unknown>>(sanitizedStickyState);
+    useState<Record<string, unknown>>(
+      sanitizeStateForRequest(sanitizedStickyState, debugModeEnabled),
+    );
   const [isComplete, setIsComplete] = useState(false);
   const [activeQuickReplies, setActiveQuickReplies] = useState<QuickReplyOption[]>([]);
 
@@ -77,6 +167,18 @@ export function useChat(
     setIsComplete(false);
     setActiveQuickReplies([]);
   }, [initialAssistantMessage, sanitizedStickyState]);
+
+  useEffect(() => {
+    setConversationState((previous) =>
+      sanitizeStateForRequest(
+        {
+          ...previous,
+          ...sanitizedStickyState,
+        },
+        debugModeEnabled,
+      ),
+    );
+  }, [debugModeEnabled, sanitizedStickyState]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -96,11 +198,18 @@ export function useChat(
 
       try {
         const nextSessionId = sessionId ?? createSessionId();
+        const requestState = sanitizeStateForRequest(
+          {
+            ...conversationState,
+            ...sanitizedStickyState,
+          },
+          debugModeEnabled,
+        );
         // Call API
         const apiResponse = await sendChatMessage({
           currentAnswer: trimmed,
           sessionId: nextSessionId,
-          state: conversationState,
+          state: requestState,
         });
 
         // Parse response
@@ -109,10 +218,10 @@ export function useChat(
         // Update conversation state
         setSessionId(parsed.conversationId ?? nextSessionId);
         if (parsed.state) {
-          setConversationState({
+          setConversationState(sanitizeStateForRequest({
             ...parsed.state,
             ...sanitizedStickyState,
-          });
+          }, debugModeEnabled));
         }
         setIsComplete(parsed.isComplete);
         setActiveQuickReplies(parsed.isComplete ? [] : parsed.quickReplies);
@@ -153,6 +262,17 @@ export function useChat(
           });
         }
 
+        if (debugModeEnabled && showDebugMessages) {
+          const debugMessage = buildDebugMessage(parsed.state);
+          if (debugMessage) {
+            assistantMessages.push({
+              role: ROLE_ASSISTANT,
+              content: debugMessage,
+              variant: "debug",
+            });
+          }
+        }
+
         if (assistantMessages.length > 0) {
           setMessages((prev) => {
             const nextMessages = [...prev];
@@ -168,6 +288,17 @@ export function useChat(
                   continue;
                 }
               }
+              if (message.variant === "debug") {
+                const lastMessage = nextMessages[nextMessages.length - 1];
+                if (
+                  lastMessage &&
+                  lastMessage.role === ROLE_ASSISTANT &&
+                  lastMessage.variant === "debug" &&
+                  lastMessage.content.trim() === message.content.trim()
+                ) {
+                  continue;
+                }
+              }
               nextMessages.push(message);
             }
             return nextMessages;
@@ -177,24 +308,33 @@ export function useChat(
         const message = err instanceof Error ? err.message : "Onbekende fout";
         setError(message);
         setSessionId(null);
-        setConversationState(sanitizedStickyState);
+        setConversationState(
+          sanitizeStateForRequest(sanitizedStickyState, debugModeEnabled),
+        );
         setIsComplete(false);
         setActiveQuickReplies([]);
       } finally {
         setLoading(false);
       }
     },
-    [conversationState, isComplete, sanitizedStickyState, sessionId],
+    [
+      conversationState,
+      debugModeEnabled,
+      isComplete,
+      sanitizedStickyState,
+      sessionId,
+      showDebugMessages,
+    ],
   );
 
   const reset = useCallback((welcomeMessage?: string) => {
     setMessages(welcomeMessage ? [{ role: ROLE_ASSISTANT, content: welcomeMessage, rich: null }] : []);
     setError(null);
     setSessionId(null);
-    setConversationState(sanitizedStickyState);
+    setConversationState(sanitizeStateForRequest(sanitizedStickyState, debugModeEnabled));
     setIsComplete(false);
     setActiveQuickReplies([]);
-  }, [sanitizedStickyState]);
+  }, [debugModeEnabled, sanitizedStickyState]);
 
   return {
     messages,

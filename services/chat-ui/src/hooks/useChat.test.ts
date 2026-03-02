@@ -108,4 +108,57 @@ describe("useChat quick replies", () => {
     expect(result.current.activeQuickReplies).toEqual([]);
     expect(result.current.error).toBe("Netwerkfout");
   });
+
+  it("includes debug_mode in request state when debug is enabled", async () => {
+    mockedSendChatMessage.mockResolvedValue({
+      type: "answer",
+      text: "Debug staat aan.",
+      conversation_id: "session-1",
+      state: { phase: "intake" },
+    });
+
+    const { result } = renderHook(() => useChat(undefined, undefined, { debugModeEnabled: true }));
+
+    await act(async () => {
+      await result.current.sendMessage("Hallo");
+    });
+
+    expect(mockedSendChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: expect.objectContaining({ debug_mode: true }),
+      }),
+    );
+  });
+
+  it("shows a compact debug message when state contains a debug trace", async () => {
+    mockedSendChatMessage.mockResolvedValue({
+      type: "question",
+      text: "Wat is je budget?",
+      conversation_id: "session-1",
+      state: {
+        debug: {
+          enabled: true,
+          trace: [
+            {
+              turn: 2,
+              action: "question",
+              meal_mode: "drinking_only",
+              controller_explanation: "Budget preference is still missing.",
+              question_text: "Wat is je budget?",
+            },
+          ],
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useChat(undefined, undefined, { debugModeEnabled: true }));
+
+    await act(async () => {
+      await result.current.sendMessage("Gewoon los drinken");
+    });
+
+    const assistantMessages = result.current.messages.filter((message) => message.role === "assistant");
+    expect(assistantMessages.at(-1)?.variant).toBe("debug");
+    expect(assistantMessages.at(-1)?.content).toContain("Budget preference is still missing.");
+  });
 });

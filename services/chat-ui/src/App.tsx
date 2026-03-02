@@ -34,6 +34,7 @@ function App() {
   const [clientError, setClientError] = useState<string | null>(null);
   const [invalidLocation, setInvalidLocation] = useState<InvalidLocationState | null>(null);
   const [hasEnteredChat, setHasEnteredChat] = useState(false);
+  const [debugModeEnabled, setDebugModeEnabled] = useState(false);
 
   const {
     messages,
@@ -46,6 +47,7 @@ function App() {
   } = useChat(
     client?.welcomeMessage,
     stickyConversationState,
+    { debugModeEnabled },
   );
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -54,6 +56,9 @@ function App() {
       try {
         const config = await fetchClientConfig();
         setClient(config);
+        setDebugModeEnabled(
+          config.debug?.toggleEnabled === true && config.debug?.defaultEnabled === true,
+        );
 
         const normalizedAllowedLocations = Array.isArray(config.allowedLocations)
           ? config.allowedLocations
@@ -176,6 +181,9 @@ function App() {
         theme={client.theme}
         onNewConversation={hasEnteredChat ? handleNewConversation : undefined}
         disableActions={loading}
+        debugToggleEnabled={hasEnteredChat && client.debug?.toggleEnabled === true}
+        debugModeEnabled={debugModeEnabled}
+        onDebugModeChange={setDebugModeEnabled}
       />
       <main>
         {hasEnteredChat ? (

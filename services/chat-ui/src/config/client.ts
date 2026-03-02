@@ -22,6 +22,11 @@ export type LandingConfig = {
   presets: LandingPreset[];
 };
 
+export type DebugConfig = {
+  toggleEnabled?: boolean;
+  defaultEnabled?: boolean;
+};
+
 export type ClientConfig = {
   id: string;
   displayName: string;
@@ -29,6 +34,7 @@ export type ClientConfig = {
   chatHeader?: ChatHeaderConfig;
   welcomeMessage?: string;
   allowedLocations?: string[];
+  debug?: DebugConfig;
   landing: LandingConfig;
 };
 

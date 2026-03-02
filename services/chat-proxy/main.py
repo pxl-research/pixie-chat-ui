@@ -272,6 +272,14 @@ ACTIVE_CLIENT_ALLOWED_LOCATIONS = _parse_allowed_locations(
 ACTIVE_CLIENT_ALLOWED_LOCATION_LOOKUP = {
     location.casefold(): location for location in ACTIVE_CLIENT_ALLOWED_LOCATIONS
 }
+ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED = _parse_bool(
+    os.environ.get("ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED", "false"),
+    default=False,
+)
+ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED = _parse_bool(
+    os.environ.get("ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED", "false"),
+    default=False,
+)
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
 BACKEND_BASE_URLS: Dict[str, str] = {
@@ -315,6 +323,10 @@ def build_client_payload() -> Dict[str, Any]:
         "displayName": os.environ.get("ACTIVE_CLIENT_DISPLAY_NAME", ACTIVE_CLIENT_ID),
         "theme": theme,
         "welcomeMessage": os.environ.get("ACTIVE_CLIENT_WELCOME_MESSAGE"),
+        "debug": {
+            "toggleEnabled": ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED,
+            "defaultEnabled": ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED,
+        },
         "landing": {
             "title": os.environ.get("LANDING_TITLE", DEFAULT_LANDING_TITLE),
             "researchNote": os.environ.get("LANDING_RESEARCH_NOTE", DEFAULT_LANDING_RESEARCH_NOTE),

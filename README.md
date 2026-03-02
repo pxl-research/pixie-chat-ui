@@ -42,6 +42,21 @@ npm run generate:chat-contract
 
 Vanaf `chat-v2.0.0` ondersteunt het contract ook optionele `quick_replies` op answer-responses. De UI toont die als klikbare antwoordchips boven het invoerveld.
 
+### Debugmodus (beslisuitleg)
+
+Voor de questioner-flow kun je in de UI een debugtoggle tonen die `state.debug_mode=true`
+meestuurt. De backend kan dan een compacte trace teruggeven in `state.debug.trace`
+(geen verborgen chain-of-thought).
+
+- `ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED=true` toont de debugtoggle in de chatheader.
+- `ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED=true` zet die toggle standaard aan.
+
+Aan backendzijde kun je debug hard uitzetten met:
+
+- `WINE_ADVISOR_DEBUG_ENABLED=false` (in `pixie-questioner`).
+
+Als backend-debug uit staat, heeft de UI-toggle geen effect op de response.
+
 ### Ontwikkelen met Docker Compose
 
 Gebruik het env-bestand `.env.dev` in de projectroot (kopieer `.env.example` indien nodig) en de compose-file `infra/docker/docker-compose.dev.yml`:

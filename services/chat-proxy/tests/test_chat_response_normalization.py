@@ -185,3 +185,17 @@ def test_call_qa_backend_accepts_questioner_contract_v2_by_default(
         assert contract_version == "chat-v2.0.0"
 
     asyncio.run(run_test())
+
+
+def test_build_client_payload_exposes_debug_toggle_flags() -> None:
+    original_toggle = main.ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED
+    original_default = main.ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED
+    try:
+        main.ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED = True
+        main.ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED = False
+        payload = main.build_client_payload()
+    finally:
+        main.ACTIVE_CLIENT_DEBUG_TOGGLE_ENABLED = original_toggle
+        main.ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED = original_default
+
+    assert payload["debug"] == {"toggleEnabled": True, "defaultEnabled": False}

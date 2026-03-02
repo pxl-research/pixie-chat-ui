@@ -118,6 +118,8 @@ export function ChatWindow({
                       ? "You"
                       : message.variant === "summary"
                         ? "Samenvatting"
+                        : message.variant === "debug"
+                          ? "Debug"
                         : headerTitle}
                   </span>
                   {message.content ? (

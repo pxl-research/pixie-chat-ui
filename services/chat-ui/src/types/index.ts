@@ -2,7 +2,7 @@ import type { Role } from "../constants";
 
 export type ChatRole = Role;
 
-export type MessageVariant = "summary";
+export type MessageVariant = "summary" | "debug";
 
 export type QuickReplyOption = {
   label: string;
