@@ -31,7 +31,7 @@ PIXIE_BACKEND_TARGET=questioner
 
 De basis-URLs voor recommender, informer en questioner stel je via env vars in: `PIXIE_CORE_API_BASE_URL`, `PIXIE_INFORMER_API_BASE_URL` en `PIXIE_QUESTIONER_API_BASE_URL` (in Docker Compose alvast ingesteld in `infra/docker/docker-compose.dev.yml`). Standaard wijzen ze naar `http://recommender-api:8000`, `http://informer-api:8000` en `http://questioner-api:8000`. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
 
-Wanneer `PIXIE_BACKEND_TARGET=questioner` controleert de proxy ook de contractversie via header `X-Pixie-Chat-Contract`. Standaard verwacht de proxy `chat-v1.1.0` (`PIXIE_CHAT_CONTRACT_VERSION`) en weigert hij mismatches (`STRICT_QUESTIONER_CHAT_CONTRACT=true`).
+Wanneer `PIXIE_BACKEND_TARGET=questioner` controleert de proxy ook de contractversie via header `X-Pixie-Chat-Contract`. Standaard verwacht de proxy `chat-v2.0.0` (`PIXIE_CHAT_CONTRACT_VERSION`) en weigert hij mismatches (`STRICT_QUESTIONER_CHAT_CONTRACT=true`).
 
 Voor de UI-types staat een gegenereerd contractbestand in `services/chat-ui/src/api/generated/chatContract.ts`. Regenereren kan met:
 
@@ -40,7 +40,7 @@ cd services/chat-ui
 npm run generate:chat-contract
 ```
 
-Vanaf `chat-v1.1.0` ondersteunt het contract ook optionele `quick_replies` op answer-responses. De UI toont die als klikbare antwoordchips boven het invoerveld.
+Vanaf `chat-v2.0.0` ondersteunt het contract ook optionele `quick_replies` op answer-responses. De UI toont die als klikbare antwoordchips boven het invoerveld.
 
 ### Ontwikkelen met Docker Compose
 

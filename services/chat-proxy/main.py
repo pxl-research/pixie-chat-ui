@@ -15,7 +15,7 @@ app = FastAPI()
 
 DEFAULT_CORS_ALLOW_ORIGINS = "http://localhost:3000"
 DEFAULT_BACKEND_TARGET = "recommender"
-DEFAULT_CHAT_CONTRACT_VERSION = "chat-v1.1.0"
+DEFAULT_CHAT_CONTRACT_VERSION = "chat-v2.0.0"
 DEFAULT_LANDING_TITLE = "Welkom bij onze AI-assistent"
 DEFAULT_LANDING_RESEARCH_NOTE = (
     "Deze AI-assistent maakt deel uit van een TETRA-onderzoeksproject. De antwoorden zijn experimenteel en kunnen onvolledig of onjuist zijn."

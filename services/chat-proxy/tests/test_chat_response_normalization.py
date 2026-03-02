@@ -1,7 +1,9 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
 
+import httpx
 import pytest
 
 os.environ.setdefault("ACTIVE_CLIENT_ID", "test-client")
@@ -134,3 +136,52 @@ def test_normalize_chat_response_supports_alternative_keys(
     result = _normalize({"type": "answer", "text": "Vraag", key: ["Ja"]})
 
     assert result["quick_replies"] == expected
+
+
+def test_call_qa_backend_accepts_questioner_contract_v2_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StubHttpClient:
+        def __init__(self, response: httpx.Response) -> None:
+            self._response = response
+
+        async def post(self, *_args: object, **_kwargs: object) -> httpx.Response:
+            return self._response
+
+    async def run_test() -> None:
+        original_target = main.PIXIE_BACKEND_TARGET
+        original_contract = main.PIXIE_CHAT_CONTRACT_VERSION
+        original_strict = main.STRICT_QUESTIONER_CHAT_CONTRACT
+
+        try:
+            main.PIXIE_BACKEND_TARGET = "questioner"
+            main.PIXIE_CHAT_CONTRACT_VERSION = main.DEFAULT_CHAT_CONTRACT_VERSION
+            main.STRICT_QUESTIONER_CHAT_CONTRACT = True
+
+            backend_response = httpx.Response(
+                status_code=200,
+                request=httpx.Request("POST", "http://questioner-api:8000/chat"),
+                headers={"X-Pixie-Chat-Contract": "chat-v2.0.0"},
+                json={"type": "answer", "text": "ok", "state": {}},
+            )
+
+            async def fake_get_http_client() -> StubHttpClient:
+                return StubHttpClient(backend_response)
+
+            monkeypatch.setattr(main, "get_http_client", fake_get_http_client)
+
+            data, contract_version = await main.call_qa_backend(
+                current_answer="Hallo",
+                session_id="session-1",
+                state={},
+                history=None,
+            )
+        finally:
+            main.PIXIE_BACKEND_TARGET = original_target
+            main.PIXIE_CHAT_CONTRACT_VERSION = original_contract
+            main.STRICT_QUESTIONER_CHAT_CONTRACT = original_strict
+
+        assert data["text"] == "ok"
+        assert contract_version == "chat-v2.0.0"
+
+    asyncio.run(run_test())

@@ -57,7 +57,7 @@ async function mockApi(page: Page): Promise<void> {
     if (turn === 1) {
       await route.fulfill({
         status: 200,
-        headers: { "X-Pixie-Chat-Contract": "chat-v1.1.0" },
+        headers: { "X-Pixie-Chat-Contract": "chat-v2.0.0" },
         contentType: "application/json",
         body: JSON.stringify({
           type: "answer",
@@ -81,7 +81,7 @@ async function mockApi(page: Page): Promise<void> {
     const accepted = answer.includes("yes") || answer.includes("ja");
     await route.fulfill({
       status: 200,
-      headers: { "X-Pixie-Chat-Contract": "chat-v1.1.0" },
+      headers: { "X-Pixie-Chat-Contract": "chat-v2.0.0" },
       contentType: "application/json",
       body: JSON.stringify(
         accepted
