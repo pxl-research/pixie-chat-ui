@@ -1,12 +1,14 @@
 import os
+import json
+from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,12 +26,33 @@ DEFAULT_LANDING_PRIVACY_NOTE = (
     "We vragen of bewaren geen persoonsgegevens. Anonieme gebruiksgegevens worden verzameld om het onderzoek te verbeteren, met respect voor de GDPR-richtlijnen."
 )
 MAX_LOCATION_LENGTH = 120
+MAX_CHAT_INPUT_CHARS = 600
+MAX_CHAT_STATE_BYTES = 16_000
+MAX_CHAT_HISTORY_ITEMS = 12
+MAX_CHAT_HISTORY_ENTRY_CHARS = 320
+RATE_LIMIT_PER_MINUTE = 24
+RATE_LIMIT_PER_HOUR = 240
+RATE_LIMIT_BLOCK_SECONDS = 300
+SESSION_IDLE_TIMEOUT_SECONDS = 900
+SESSION_TRACKING_TTL_SECONDS = 86_400
 
 
 def _parse_bool(raw: str, default: bool = False) -> bool:
     if not raw:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_int(raw: str | None, default: int, minimum: int) -> int:
+    if raw is None or not raw.strip():
+        return default
+    try:
+        parsed = int(raw.strip())
+    except ValueError:
+        return default
+    if parsed < minimum:
+        return minimum
+    return parsed
 
 
 def _normalize_url(raw: str) -> str:
@@ -282,6 +305,46 @@ ACTIVE_CLIENT_DEBUG_DEFAULT_ENABLED = _parse_bool(
 )
 
 PIXIE_API_KEY = os.environ.get("PIXIE_API_KEY")
+MAX_CHAT_INPUT_CHARS = _parse_int(
+    os.environ.get("MAX_CHAT_INPUT_CHARS"),
+    MAX_CHAT_INPUT_CHARS,
+    minimum=80,
+)
+MAX_CHAT_STATE_BYTES = _parse_int(
+    os.environ.get("MAX_CHAT_STATE_BYTES"),
+    MAX_CHAT_STATE_BYTES,
+    minimum=1024,
+)
+MAX_CHAT_HISTORY_ITEMS = _parse_int(
+    os.environ.get("MAX_CHAT_HISTORY_ITEMS"),
+    MAX_CHAT_HISTORY_ITEMS,
+    minimum=1,
+)
+MAX_CHAT_HISTORY_ENTRY_CHARS = _parse_int(
+    os.environ.get("MAX_CHAT_HISTORY_ENTRY_CHARS"),
+    MAX_CHAT_HISTORY_ENTRY_CHARS,
+    minimum=40,
+)
+RATE_LIMIT_PER_MINUTE = _parse_int(
+    os.environ.get("RATE_LIMIT_PER_MINUTE"),
+    RATE_LIMIT_PER_MINUTE,
+    minimum=1,
+)
+RATE_LIMIT_PER_HOUR = _parse_int(
+    os.environ.get("RATE_LIMIT_PER_HOUR"),
+    RATE_LIMIT_PER_HOUR,
+    minimum=RATE_LIMIT_PER_MINUTE,
+)
+RATE_LIMIT_BLOCK_SECONDS = _parse_int(
+    os.environ.get("RATE_LIMIT_BLOCK_SECONDS"),
+    RATE_LIMIT_BLOCK_SECONDS,
+    minimum=1,
+)
+SESSION_IDLE_TIMEOUT_SECONDS = _parse_int(
+    os.environ.get("SESSION_IDLE_TIMEOUT_SECONDS"),
+    SESSION_IDLE_TIMEOUT_SECONDS,
+    minimum=30,
+)
 BACKEND_BASE_URLS: Dict[str, str] = {
     "recommender": PIXIE_CORE_API_BASE_URL,
     "informer": PIXIE_INFORMER_API_BASE_URL,
@@ -295,6 +358,10 @@ HEALTH_CACHE_SECONDS = 15
 BackendHealth = Dict[str, Optional[Any]]
 _backend_health: BackendHealth = {"status": "unknown", "detail": None, "checked_at": None}
 _http_client: Optional[httpx.AsyncClient] = None
+_minute_window_by_client: dict[str, deque[datetime]] = defaultdict(deque)
+_hour_window_by_client: dict[str, deque[datetime]] = defaultdict(deque)
+_blocked_until_by_client: dict[str, datetime] = {}
+_session_last_seen_by_id: dict[str, datetime] = {}
 
 
 def build_client_payload() -> Dict[str, Any]:
@@ -398,6 +465,149 @@ async def ensure_backend_ready() -> None:
         raise HTTPException(status_code=503, detail=state["detail"] or "Configured Pixie backend is not reachable.")
 
 
+def _prune_window(entries: deque[datetime], cutoff: datetime) -> None:
+    while entries and entries[0] < cutoff:
+        entries.popleft()
+
+
+def _resolve_client_key(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        client_ip = forwarded_for.split(",", maxsplit=1)[0].strip()
+    elif request.client is not None:
+        client_ip = request.client.host
+    else:
+        client_ip = "unknown"
+
+    location_code = (
+        request.cookies.get("pixie_loc_code")
+        or request.headers.get("x-pixie-location-code", "").strip()
+        or "-"
+    )
+    return f"{client_ip}|{location_code}"
+
+
+def _cleanup_tracking(now: datetime) -> None:
+    stale_cutoff = now - timedelta(seconds=SESSION_TRACKING_TTL_SECONDS)
+    for session_id, seen_at in list(_session_last_seen_by_id.items()):
+        if seen_at < stale_cutoff:
+            _session_last_seen_by_id.pop(session_id, None)
+
+    for client_key, blocked_until in list(_blocked_until_by_client.items()):
+        if blocked_until <= now:
+            _blocked_until_by_client.pop(client_key, None)
+
+    minute_cutoff = now - timedelta(minutes=1)
+    for client_key, window in list(_minute_window_by_client.items()):
+        _prune_window(window, minute_cutoff)
+        if not window:
+            _minute_window_by_client.pop(client_key, None)
+
+    hour_cutoff = now - timedelta(hours=1)
+    for client_key, window in list(_hour_window_by_client.items()):
+        _prune_window(window, hour_cutoff)
+        if not window:
+            _hour_window_by_client.pop(client_key, None)
+
+
+def _enforce_payload_limits(current_answer: str, state: Dict[str, Any], history: List[str] | None) -> List[str] | None:
+    if len(current_answer) > MAX_CHAT_INPUT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Input exceeds maximum length ({MAX_CHAT_INPUT_CHARS} chars).",
+        )
+
+    try:
+        serialized_state = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid state payload.") from exc
+
+    state_size = len(serialized_state.encode("utf-8"))
+    if state_size > MAX_CHAT_STATE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"State exceeds maximum size ({MAX_CHAT_STATE_BYTES} bytes).",
+        )
+
+    if not history:
+        return None
+
+    if len(history) > MAX_CHAT_HISTORY_ITEMS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"History exceeds maximum item count ({MAX_CHAT_HISTORY_ITEMS}).",
+        )
+
+    sanitized_history: list[str] = []
+    for item in history:
+        normalized = " ".join(item.split())
+        if not normalized:
+            continue
+        if len(normalized) > MAX_CHAT_HISTORY_ENTRY_CHARS:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "History entry exceeds maximum length "
+                    f"({MAX_CHAT_HISTORY_ENTRY_CHARS} chars)."
+                ),
+            )
+        sanitized_history.append(normalized)
+
+    return sanitized_history or None
+
+
+def _enforce_abuse_limits(request: Request, session_id: str) -> None:
+    now = _now()
+    _cleanup_tracking(now)
+    client_key = _resolve_client_key(request)
+
+    blocked_until = _blocked_until_by_client.get(client_key)
+    if blocked_until is not None and blocked_until > now:
+        retry_after = max(1, int((blocked_until - now).total_seconds()))
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please try again shortly.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    minute_window = _minute_window_by_client[client_key]
+    hour_window = _hour_window_by_client[client_key]
+
+    _prune_window(minute_window, now - timedelta(minutes=1))
+    _prune_window(hour_window, now - timedelta(hours=1))
+
+    if len(minute_window) >= RATE_LIMIT_PER_MINUTE or len(hour_window) >= RATE_LIMIT_PER_HOUR:
+        blocked = now + timedelta(seconds=RATE_LIMIT_BLOCK_SECONDS)
+        _blocked_until_by_client[client_key] = blocked
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please try again shortly.",
+            headers={"Retry-After": str(RATE_LIMIT_BLOCK_SECONDS)},
+        )
+
+    previous_seen = _session_last_seen_by_id.get(session_id)
+    if previous_seen is not None:
+        idle_seconds = (now - previous_seen).total_seconds()
+        if idle_seconds > SESSION_IDLE_TIMEOUT_SECONDS:
+            _session_last_seen_by_id.pop(session_id, None)
+            raise HTTPException(
+                status_code=440,
+                detail="Session expired due to inactivity. Start a new conversation.",
+            )
+
+    minute_window.append(now)
+    hour_window.append(now)
+    _session_last_seen_by_id[session_id] = now
+
+
+def _apply_gateway_location(state: Dict[str, Any], request: Request) -> Dict[str, Any]:
+    normalized_state = dict(state)
+    gateway_location = _normalize_location_value(request.headers.get("X-Pixie-Location"))
+    if gateway_location is not None:
+        normalized_state["location"] = gateway_location
+    return normalized_state
+
+
 @app.on_event("startup")
 async def startup_check() -> None:
     global _http_client
@@ -465,12 +675,24 @@ async def call_pixie(payload: Dict[str, Any]) -> Dict[str, Any]:
 class ChatRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    session_id: str | None = None
-    current_answer: str | None = None
+    session_id: str | None = Field(default=None, max_length=128)
+    current_answer: str | None = Field(default=None, max_length=MAX_CHAT_INPUT_CHARS)
     state: Dict[str, Any] | None = None
-    user_input: str | None = Field(default=None, alias="input")
-    conversation_id: str | None = Field(default=None, alias="conversationId")
+    user_input: str | None = None
+    conversation_id: str | None = Field(default=None, max_length=128)
     history: List[str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        if "user_input" not in normalized and "input" in normalized:
+            normalized["user_input"] = normalized.get("input")
+        if "conversation_id" not in normalized and "conversationId" in normalized:
+            normalized["conversation_id"] = normalized.get("conversationId")
+        return normalized
 
 
 async def call_qa_backend(
@@ -586,32 +808,34 @@ def _normalize_chat_response(
 
 
 @app.post("/chat")
-async def chat(payload: ChatRequest, response: Response) -> Dict[str, Any]:
+async def chat(payload: ChatRequest, response: Response, request: Request) -> Dict[str, Any]:
     """Forward chat request to the configured Pixie backend for the active client."""
     current_answer = (payload.current_answer or payload.user_input or "").strip()
     if not current_answer:
         raise HTTPException(status_code=400, detail="Input may not be empty.")
 
+    has_session = bool(payload.session_id or payload.conversation_id)
+    session_id = payload.session_id or payload.conversation_id or str(uuid4())
+    request_state = payload.state if isinstance(payload.state, dict) else {}
+    request_state = _apply_gateway_location(request_state, request)
+    sanitized_history = _enforce_payload_limits(current_answer, request_state, payload.history)
+    _enforce_abuse_limits(request, session_id)
+
     await ensure_backend_ready()
 
     if PIXIE_BACKEND_TARGET in {"informer", "questioner"}:
-        session_id = payload.session_id or payload.conversation_id or str(uuid4())
-        request_state = payload.state if isinstance(payload.state, dict) else {}
         state = _normalize_state_location(request_state, strict=True)
         qa_response = await call_qa_backend(
             current_answer=current_answer,
             session_id=session_id,
             state=state,
-            history=payload.history,
+            history=sanitized_history,
         )
         qa_data, contract_version = qa_response
         if PIXIE_BACKEND_TARGET == "questioner" and contract_version is not None:
             response.headers["X-Pixie-Chat-Contract"] = contract_version
         return _normalize_chat_response(qa_data, session_id, state)
 
-    has_session = bool(payload.session_id or payload.conversation_id)
-    session_id = payload.session_id or payload.conversation_id or str(uuid4())
-    request_state = payload.state if isinstance(payload.state, dict) else {}
     state = _normalize_state_location(request_state, strict=True)
     if has_session:
         pixie_payload = {"conversation_id": session_id, "message": current_answer}

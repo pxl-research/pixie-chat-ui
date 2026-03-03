@@ -31,6 +31,11 @@ PIXIE_BACKEND_TARGET=questioner
 
 De basis-URLs voor recommender, informer en questioner stel je via env vars in: `PIXIE_CORE_API_BASE_URL`, `PIXIE_INFORMER_API_BASE_URL` en `PIXIE_QUESTIONER_API_BASE_URL` (in Docker Compose alvast ingesteld in `infra/docker/docker-compose.dev.yml`). Standaard wijzen ze naar `http://recommender-api:8000`, `http://informer-api:8000` en `http://questioner-api:8000`. In beide gevallen gebruikt de UI automatisch de gesprekshistoriek en sessie-id zodat vervolgvragen hun context behouden.
 
+Voor misbruikpreventie in de proxy kun je harde limieten instellen via env vars:
+`MAX_CHAT_INPUT_CHARS`, `MAX_CHAT_STATE_BYTES`, `MAX_CHAT_HISTORY_ITEMS`,
+`MAX_CHAT_HISTORY_ENTRY_CHARS`, `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_PER_HOUR`,
+`RATE_LIMIT_BLOCK_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS`.
+
 Wanneer `PIXIE_BACKEND_TARGET=questioner` controleert de proxy ook de contractversie via header `X-Pixie-Chat-Contract`. Standaard verwacht de proxy `chat-v2.0.0` (`PIXIE_CHAT_CONTRACT_VERSION`) en weigert hij mismatches (`STRICT_QUESTIONER_CHAT_CONTRACT=true`).
 
 Voor de UI-types staat een gegenereerd contractbestand in `services/chat-ui/src/api/generated/chatContract.ts`. Regenereren kan met:
