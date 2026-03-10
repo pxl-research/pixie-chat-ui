@@ -5,6 +5,9 @@ export type KioskConfig = {
   resetDelayMs: number;
 };
 
+const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
+const DEFAULT_RESET_DELAY_MS = 10_000;
+
 function readRequiredEnv(name: keyof ImportMetaEnv): string {
   const value = import.meta.env[name];
   if (!value || !value.trim()) {
@@ -31,7 +34,14 @@ export function readKioskConfig(): KioskConfig {
   return {
     questionerBaseUrl: readRequiredEnv("VITE_QUESTIONER_API_BASE_URL").replace(/\/$/, ""),
     caseId: readRequiredEnv("VITE_QUESTIONER_CASE_ID"),
-    idleTimeoutMs: readNumberEnv("VITE_KIOSK_IDLE_TIMEOUT_MS", 90_000),
-    resetDelayMs: readNumberEnv("VITE_KIOSK_RESET_DELAY_MS", 10_000),
+    idleTimeoutMs: readNumberEnv("VITE_KIOSK_IDLE_TIMEOUT_MS", DEFAULT_IDLE_TIMEOUT_MS),
+    resetDelayMs: readNumberEnv("VITE_KIOSK_RESET_DELAY_MS", DEFAULT_RESET_DELAY_MS),
+  };
+}
+
+export function readKioskTimingConfig(): Pick<KioskConfig, "idleTimeoutMs" | "resetDelayMs"> {
+  return {
+    idleTimeoutMs: readNumberEnv("VITE_KIOSK_IDLE_TIMEOUT_MS", DEFAULT_IDLE_TIMEOUT_MS),
+    resetDelayMs: readNumberEnv("VITE_KIOSK_RESET_DELAY_MS", DEFAULT_RESET_DELAY_MS),
   };
 }

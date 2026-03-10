@@ -1,31 +1,44 @@
+import { ChatScreen } from "./components/ChatScreen";
+import { CompletedScreen } from "./components/CompletedScreen";
+import { ErrorScreen } from "./components/ErrorScreen";
+import { StartScreen } from "./components/StartScreen";
 import { useKioskSession } from "./hooks/useKioskSession";
 
 export default function App() {
   const session = useKioskSession();
 
-  if (session.phase !== "start") {
-    return (
-      <main className="kiosk-shell">
-        <section className="kiosk-start">
-          <p className="kiosk-start__eyebrow">Cretskens</p>
-          <h1 className="kiosk-start__title">Gesprek actief</h1>
-          <button type="button" className="kiosk-start__button" onClick={session.resetConversation}>
-            Opnieuw starten
-          </button>
-        </section>
-      </main>
-    );
+  let content;
+  switch (session.phase) {
+    case "chatting":
+      content = (
+        <ChatScreen
+          title="Cretskens Assistent"
+          messages={session.messages}
+          quickReplies={session.quickReplies}
+          loading={session.loading}
+          onRestart={session.resetConversation}
+          onSendMessage={session.sendUserMessage}
+        />
+      );
+      break;
+    case "completed":
+      content = <CompletedScreen onRestart={session.resetConversation} />;
+      break;
+    case "error":
+      content = (
+        <ErrorScreen
+          error={session.error ?? "De kioskservice is tijdelijk onbereikbaar."}
+          onRetry={session.resetConversation}
+        />
+      );
+      break;
+    default:
+      content = <StartScreen onStart={session.startConversation} />;
   }
 
   return (
     <main className="kiosk-shell">
-      <section className="kiosk-start">
-        <p className="kiosk-start__eyebrow">Cretskens</p>
-        <h1 className="kiosk-start__title">Cretskens Assistent</h1>
-        <button type="button" className="kiosk-start__button" onClick={session.startConversation}>
-          Start gesprek
-        </button>
-      </section>
+      {content}
     </main>
   );
 }

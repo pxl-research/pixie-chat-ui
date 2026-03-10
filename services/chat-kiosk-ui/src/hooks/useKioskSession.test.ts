@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useKioskSession } from "./useKioskSession";
 
@@ -11,6 +11,10 @@ const kioskConfig = {
 };
 
 describe("useKioskSession", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("moves from start to chatting when a session begins", async () => {
     const sendMessage = vi.fn();
     const { result } = renderHook(() =>
@@ -64,5 +68,63 @@ describe("useKioskSession", () => {
       { label: "Ja", value: "yes" },
       { label: "Nee", value: "no" },
     ]);
+  });
+
+  it("returns to the start phase after the completed delay", async () => {
+    vi.useFakeTimers();
+
+    const sendMessage = vi.fn().mockResolvedValue({
+      type: "summary",
+      text: "Bedankt voor je bezoek",
+      summary: "Samenvatting",
+      conversation_id: "session-1",
+      state: { phase: "completed" },
+    });
+    const { result } = renderHook(() =>
+      useKioskSession({
+        config: kioskConfig,
+        sendMessage,
+      }),
+    );
+
+    act(() => {
+      result.current.startConversation();
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessage("Hallo");
+    });
+
+    expect(result.current.phase).toBe("completed");
+
+    act(() => {
+      vi.advanceTimersByTime(kioskConfig.resetDelayMs);
+    });
+
+    expect(result.current.phase).toBe("start");
+  });
+
+  it("resets the session after inactivity", async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useKioskSession({
+        config: kioskConfig,
+        sendMessage: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.startConversation();
+    });
+
+    expect(result.current.phase).toBe("chatting");
+
+    act(() => {
+      vi.advanceTimersByTime(kioskConfig.idleTimeoutMs);
+    });
+
+    expect(result.current.phase).toBe("start");
+    expect(result.current.messages).toEqual([]);
   });
 });

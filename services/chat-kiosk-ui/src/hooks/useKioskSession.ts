@@ -6,7 +6,11 @@ import {
   type QuickReplyOption,
 } from "@pixie-chat/responseParser";
 
-import { readKioskConfig, type KioskConfig } from "../config";
+import {
+  readKioskConfig,
+  readKioskTimingConfig,
+  type KioskConfig,
+} from "../config";
 import {
   sendQuestionerMessage,
   type QuestionerChatResponse,
@@ -50,6 +54,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<Record<string, unknown>>({});
   const idleTimeoutRef = useRef<number | null>(null);
+  const completedTimeoutRef = useRef<number | null>(null);
 
   const clearIdleTimeout = useCallback(() => {
     if (idleTimeoutRef.current !== null) {
@@ -58,8 +63,16 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     }
   }, []);
 
+  const clearCompletedTimeout = useCallback(() => {
+    if (completedTimeoutRef.current !== null) {
+      window.clearTimeout(completedTimeoutRef.current);
+      completedTimeoutRef.current = null;
+    }
+  }, []);
+
   const resetConversation = useCallback(() => {
     clearIdleTimeout();
+    clearCompletedTimeout();
     setPhase("start");
     setMessages([]);
     setQuickReplies([]);
@@ -67,19 +80,34 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     setError(null);
     setSessionId(null);
     setConversationState({});
-  }, [clearIdleTimeout]);
+  }, [clearCompletedTimeout, clearIdleTimeout]);
 
   const armIdleTimeout = useCallback(() => {
     clearIdleTimeout();
-    const resolvedConfig = config ?? readKioskConfig();
+    const resolvedTiming = config ?? readKioskTimingConfig();
     idleTimeoutRef.current = window.setTimeout(() => {
       resetConversation();
-    }, resolvedConfig.idleTimeoutMs);
+    }, resolvedTiming.idleTimeoutMs);
   }, [clearIdleTimeout, config, resetConversation]);
 
-  useEffect(() => clearIdleTimeout, [clearIdleTimeout]);
+  const armCompletedTimeout = useCallback(() => {
+    clearCompletedTimeout();
+    const resolvedTiming = config ?? readKioskTimingConfig();
+    completedTimeoutRef.current = window.setTimeout(() => {
+      resetConversation();
+    }, resolvedTiming.resetDelayMs);
+  }, [clearCompletedTimeout, config, resetConversation]);
+
+  useEffect(
+    () => () => {
+      clearIdleTimeout();
+      clearCompletedTimeout();
+    },
+    [clearCompletedTimeout, clearIdleTimeout],
+  );
 
   const startConversation = useCallback(() => {
+    clearCompletedTimeout();
     setMessages([]);
     setQuickReplies([]);
     setError(null);
@@ -88,7 +116,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     setSessionId(createSessionId());
     setPhase("chatting");
     armIdleTimeout();
-  }, [armIdleTimeout]);
+  }, [armIdleTimeout, clearCompletedTimeout]);
 
   const sendUserMessage = useCallback(
     async (content: string) => {
@@ -105,6 +133,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
       setError(null);
       setQuickReplies([]);
       setSessionId(activeSessionId);
+      clearCompletedTimeout();
       setMessages((previous) => [
         ...previous,
         {
@@ -152,14 +181,17 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         }
 
         if (parsed.isComplete) {
+          clearIdleTimeout();
           setPhase("completed");
           setQuickReplies([]);
+          armCompletedTimeout();
         } else {
           setPhase("chatting");
           armIdleTimeout();
         }
       } catch (caughtError) {
         clearIdleTimeout();
+        clearCompletedTimeout();
         setPhase("error");
         setQuickReplies([]);
         setError(
@@ -169,7 +201,16 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         setLoading(false);
       }
     },
-    [armIdleTimeout, clearIdleTimeout, config, conversationState, sendMessage, sessionId],
+    [
+      armCompletedTimeout,
+      armIdleTimeout,
+      clearCompletedTimeout,
+      clearIdleTimeout,
+      config,
+      conversationState,
+      sendMessage,
+      sessionId,
+    ],
   );
 
   return {
