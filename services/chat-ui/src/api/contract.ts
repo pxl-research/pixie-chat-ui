@@ -1,6 +1,7 @@
-import type { components } from "./generated/chatContract";
-
-export const CHAT_CONTRACT_VERSION = "chat-v2.0.0";
-
-export type QuestionerChatContractRequest = components["schemas"]["ChatRequest"];
-export type QuestionerChatContractResponse = components["schemas"]["ChatResponse"];
+export {
+  CHAT_CONTRACT_VERSION,
+} from "@pixie-chat/contract";
+export type {
+  QuestionerChatContractRequest,
+  QuestionerChatContractResponse,
+} from "@pixie-chat/contract";

@@ -6,6 +6,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@pixie-chat/*": ["../../shared/pixie-chat/*"]
+    },
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -24,5 +28,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src", "../../shared/pixie-chat/**/*.ts"]
 }

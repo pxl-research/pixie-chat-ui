@@ -1,10 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { assertChatContractHeader } from "@pixie-chat/contractHeader";
 import { sendChatMessage } from "./chat";
 
 describe("sendChatMessage contract version", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("accepts chat-v2.0.0 contract headers via the shared contract helper", () => {
+    expect(() =>
+      assertChatContractHeader(
+        new Headers({
+          "X-Pixie-Chat-Contract": "chat-v2.0.0",
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it("accepts questioner responses with chat-v2.0.0 contract headers", async () => {
