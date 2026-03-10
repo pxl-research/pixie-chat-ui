@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config/client";
+import { assertChatContractHeader } from "@pixie-chat/contractHeader";
 import { CHAT_CONTRACT_VERSION, type QuestionerChatContractResponse } from "./contract";
 
 export type ChatApiRequest = {
@@ -71,18 +72,16 @@ export async function sendChatMessage(request: ChatApiRequest): Promise<ChatApiR
     throw new Error(detailMessage || `Request failed with status ${response.status}`);
   }
 
-  const contractHeader = response.headers.get("X-Pixie-Chat-Contract");
-  if (contractHeader && contractHeader !== CHAT_CONTRACT_VERSION) {
-    // Log detailed information for developers while keeping the user-facing error message generic.
-    // This avoids exposing internal contract/version details directly in the UI.
+  let contractHeader: string | null = null;
+  try {
+    contractHeader = assertChatContractHeader(response.headers);
+  } catch (error) {
+    const receivedContractVersion = response.headers.get("X-Pixie-Chat-Contract");
     console.error("Chat contract version mismatch", {
       expected: CHAT_CONTRACT_VERSION,
-      received: contractHeader,
+      received: receivedContractVersion,
     });
-
-    throw new Error(
-      "The chat service is temporarily unavailable due to a version mismatch. Please refresh the page or try again later.",
-    );
+    throw error;
   }
 
   const parsed = await response.json();
