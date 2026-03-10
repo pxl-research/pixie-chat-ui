@@ -59,6 +59,15 @@ def _normalize_url(raw: str) -> str:
     return raw.strip().rstrip("/")
 
 
+def _normalize_case_id(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    normalized = raw.strip().casefold()
+    if not normalized:
+        return None
+    return normalized
+
+
 def _parse_origins(raw: str) -> list[str]:
     if raw.strip() == "*":
         return ["*"]
@@ -288,6 +297,15 @@ _client_id = os.environ.get("ACTIVE_CLIENT_ID")
 if not _client_id:
     raise RuntimeError("ACTIVE_CLIENT_ID environment variable is required")
 ACTIVE_CLIENT_ID: str = _client_id
+PIXIE_QUESTIONER_CASE_ID = _normalize_case_id(
+    os.environ.get("PIXIE_QUESTIONER_CASE_ID")
+)
+
+if PIXIE_BACKEND_TARGET == "questioner" and PIXIE_QUESTIONER_CASE_ID is None:
+    raise RuntimeError(
+        "PIXIE_QUESTIONER_CASE_ID environment variable is required when "
+        "PIXIE_BACKEND_TARGET=questioner"
+    )
 
 ACTIVE_CLIENT_ALLOWED_LOCATIONS = _parse_allowed_locations(
     os.environ.get("ACTIVE_CLIENT_ALLOWED_LOCATIONS", "")
@@ -701,7 +719,7 @@ async def call_qa_backend(
     state: Dict[str, Any],
     history: List[str] | None,
 ) -> tuple[Dict[str, Any], str | None]:
-    """Forward chat request to the QA backend `/chat` endpoint."""
+    """Forward chat request to the configured QA backend endpoint."""
     payload = {
         "session_id": session_id,
         "current_answer": current_answer,
@@ -712,8 +730,15 @@ async def call_qa_backend(
         payload["history"] = history
 
     client = await get_http_client()
+    backend_path = "/chat"
+    if PIXIE_BACKEND_TARGET == "questioner":
+        if PIXIE_QUESTIONER_CASE_ID is None:
+            raise RuntimeError(
+                "PIXIE_QUESTIONER_CASE_ID must be configured for questioner traffic."
+            )
+        backend_path = f"/cases/{PIXIE_QUESTIONER_CASE_ID}/chat"
     try:
-        response = await client.post("/chat", json=payload)
+        response = await client.post(backend_path, json=payload)
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         try:

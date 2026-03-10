@@ -146,29 +146,38 @@ def test_call_qa_backend_accepts_questioner_contract_v2_by_default(
     class StubHttpClient:
         def __init__(self, response: httpx.Response) -> None:
             self._response = response
+            self.request_paths: list[str] = []
 
-        async def post(self, *_args: object, **_kwargs: object) -> httpx.Response:
+        async def post(self, path: str, *_args: object, **_kwargs: object) -> httpx.Response:
+            self.request_paths.append(path)
             return self._response
 
     async def run_test() -> None:
         original_target = main.PIXIE_BACKEND_TARGET
         original_contract = main.PIXIE_CHAT_CONTRACT_VERSION
+        original_case_id = main.PIXIE_QUESTIONER_CASE_ID
         original_strict = main.STRICT_QUESTIONER_CHAT_CONTRACT
 
         try:
             main.PIXIE_BACKEND_TARGET = "questioner"
             main.PIXIE_CHAT_CONTRACT_VERSION = main.DEFAULT_CHAT_CONTRACT_VERSION
+            main.PIXIE_QUESTIONER_CASE_ID = "brooklyn"
             main.STRICT_QUESTIONER_CHAT_CONTRACT = True
 
-            backend_response = httpx.Response(
-                status_code=200,
-                request=httpx.Request("POST", "http://questioner-api:8000/chat"),
-                headers={"X-Pixie-Chat-Contract": "chat-v2.0.0"},
-                json={"type": "answer", "text": "ok", "state": {}},
+            stub_client = StubHttpClient(
+                httpx.Response(
+                    status_code=200,
+                    request=httpx.Request(
+                        "POST",
+                        "http://questioner-api:8000/cases/brooklyn/chat",
+                    ),
+                    headers={"X-Pixie-Chat-Contract": "chat-v2.0.0"},
+                    json={"type": "answer", "text": "ok", "state": {}},
+                )
             )
 
             async def fake_get_http_client() -> StubHttpClient:
-                return StubHttpClient(backend_response)
+                return stub_client
 
             monkeypatch.setattr(main, "get_http_client", fake_get_http_client)
 
@@ -181,10 +190,12 @@ def test_call_qa_backend_accepts_questioner_contract_v2_by_default(
         finally:
             main.PIXIE_BACKEND_TARGET = original_target
             main.PIXIE_CHAT_CONTRACT_VERSION = original_contract
+            main.PIXIE_QUESTIONER_CASE_ID = original_case_id
             main.STRICT_QUESTIONER_CHAT_CONTRACT = original_strict
 
         assert data["text"] == "ok"
         assert contract_version == "chat-v2.0.0"
+        assert stub_client.request_paths == ["/cases/brooklyn/chat"]
 
     asyncio.run(run_test())
 
