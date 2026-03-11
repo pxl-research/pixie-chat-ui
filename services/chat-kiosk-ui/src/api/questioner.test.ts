@@ -50,4 +50,38 @@ describe("sendQuestionerMessage", () => {
       }),
     );
   });
+
+  it("normalizes same-origin base URLs with a trailing slash", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: "answer",
+          text: "Welkom",
+          conversation_id: "session-1",
+          state: {},
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Pixie-Chat-Contract": "chat-v2.0.0",
+          },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendQuestionerMessage({
+      baseUrl: "/questioner/",
+      caseId: "cretskens",
+      currentAnswer: "Hallo",
+      sessionId: "session-1",
+      state: {},
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/questioner/cases/cretskens/chat",
+      expect.any(Object),
+    );
+  });
 });

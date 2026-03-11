@@ -13,10 +13,15 @@ export type QuestionerChatResponse = PixieChatApiResponse & {
   contract_version?: string | null;
 };
 
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, "");
+}
+
 export async function sendQuestionerMessage(
   input: SendQuestionerMessageInput,
 ): Promise<QuestionerChatResponse> {
-  const response = await fetch(`${input.baseUrl}/cases/${input.caseId}/chat`, {
+  const normalizedBaseUrl = normalizeBaseUrl(input.baseUrl);
+  const response = await fetch(`${normalizedBaseUrl}/cases/${input.caseId}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

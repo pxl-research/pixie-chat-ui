@@ -10,7 +10,7 @@ describe("ChatScreen", () => {
     const onSendMessage = vi.fn(async () => undefined);
     const onRestart = vi.fn();
 
-    render(
+    const { container } = render(
       <ChatScreen
         title="Cretskens Assistent"
         messages={[
@@ -26,6 +26,8 @@ describe("ChatScreen", () => {
       />,
     );
 
+    expect(container.querySelector(".chat-screen__viewport")).toBeInTheDocument();
+    expect(container.querySelector(".chat-screen__action-rail")).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Bericht" }), "Hallo");
     await user.click(screen.getByRole("button", { name: "Versturen" }));
     await user.click(screen.getByRole("button", { name: "Ja" }));
