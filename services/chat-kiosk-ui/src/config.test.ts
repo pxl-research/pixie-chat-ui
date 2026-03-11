@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readKioskCopyConfig } from "./config";
+import { readKioskConfig, readKioskCopyConfig, readKioskTimingConfig } from "./config";
+
+type RuntimeEnv = Record<string, string>;
+
+function setRuntimeEnv(values: RuntimeEnv) {
+  window.__ENV__ = values;
+}
 
 describe("readKioskCopyConfig", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    delete window.__ENV__;
   });
 
   it("returns portrait-friendly default copy", () => {
@@ -50,6 +57,54 @@ describe("readKioskCopyConfig", () => {
       welcomeBody: "Speciaal geselecteerde copy",
       startLabel: "Begin",
       helpText: "Sta dichter bij het scherm om te starten.",
+    });
+  });
+
+  it("prefers runtime case config over build-time env vars", () => {
+    vi.stubEnv("VITE_QUESTIONER_API_BASE_URL", "https://build.example/questioner");
+    vi.stubEnv("VITE_QUESTIONER_CASE_ID", "build-case");
+    vi.stubEnv("VITE_ACTIVE_CLIENT_DISPLAY_NAME", "Build Name");
+    vi.stubEnv("VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE", "Build Header");
+
+    setRuntimeEnv({
+      QUESTIONER_API_BASE_URL: "/questioner",
+      PIXIE_QUESTIONER_CASE_ID: "runtime-case",
+      KIOSK_IDLE_TIMEOUT_MS: "120000",
+      KIOSK_RESET_DELAY_MS: "15000",
+      ACTIVE_CLIENT_DISPLAY_NAME: "Runtime Name",
+      ACTIVE_CLIENT_PRIMARY_COLOR: "#abcdef",
+      ACTIVE_CLIENT_LOGO_URL: "/branding/runtime/logo.png",
+      ACTIVE_CLIENT_LOGO_NO_TEXT_URL: "/branding/runtime/logo_no_text.png",
+      ACTIVE_CLIENT_BACKGROUND_IMAGE_URL: "/branding/runtime/background.png",
+      ACTIVE_CLIENT_WELCOME_MESSAGE: "Runtime welkom",
+      ACTIVE_CLIENT_CHAT_HEADER_TITLE: "Runtime Header",
+      KIOSK_START_LABEL: "Start runtime",
+      KIOSK_HELP_TEXT: "Runtime hulp",
+    });
+
+    expect(readKioskConfig()).toEqual({
+      questionerBaseUrl: "/questioner",
+      caseId: "runtime-case",
+      idleTimeoutMs: 120000,
+      resetDelayMs: 15000,
+    });
+    expect(readKioskTimingConfig()).toEqual({
+      idleTimeoutMs: 120000,
+      resetDelayMs: 15000,
+    });
+    expect(readKioskCopyConfig()).toEqual({
+      displayName: "Runtime Name",
+      primaryColor: "#abcdef",
+      logoUrl: "/branding/runtime/logo.png",
+      logoNoTextUrl: "/branding/runtime/logo_no_text.png",
+      backgroundImageUrl: "/branding/runtime/background.png",
+      chatHeaderTitle: "Runtime Header",
+      welcomeMessage: "Runtime welkom",
+      brandLabel: "Runtime Name",
+      welcomeTitle: "Runtime Header",
+      welcomeBody: "Runtime welkom",
+      startLabel: "Start runtime",
+      helpText: "Runtime hulp",
     });
   });
 });

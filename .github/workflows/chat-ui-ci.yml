@@ -1,4 +1,4 @@
-name: Chat UI CI
+name: Frontend CI
 
 on:
   pull_request:
@@ -19,7 +19,9 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: services/chat-ui/package-lock.json
+          cache-dependency-path: |
+            services/chat-ui/package-lock.json
+            services/chat-kiosk-ui/package-lock.json
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -42,6 +44,18 @@ jobs:
         working-directory: services/chat-ui
         run: npm run test:unit
 
+      - name: Install chat-kiosk-ui dependencies
+        working-directory: services/chat-kiosk-ui
+        run: npm ci
+
+      - name: Run chat-kiosk-ui build
+        working-directory: services/chat-kiosk-ui
+        run: npm run build
+
+      - name: Run chat-kiosk-ui unit tests
+        working-directory: services/chat-kiosk-ui
+        run: npm run test:unit
+
       - name: Install chat-proxy test dependencies
         run: |
           python -m pip install --upgrade pip
@@ -57,6 +71,24 @@ jobs:
       - name: Run Playwright E2E and visual tests
         working-directory: services/chat-ui
         run: npm run test:e2e
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build chat-ui container image
+        run: docker build -f services/chat-ui/Dockerfile -t pixie-chat-ui:ci .
+
+      - name: Build chat-kiosk-ui container image
+        run: docker build -f services/chat-kiosk-ui/Dockerfile -t pixie-chat-kiosk-ui:ci .
+
+      - name: Build chat-proxy container image
+        run: docker build -f services/chat-proxy/Dockerfile -t pixie-chat-ui-proxy:ci services/chat-proxy
+
+      - name: Build chat-kiosk-ui arm64 image
+        run: docker buildx build --platform linux/arm64 -f services/chat-kiosk-ui/Dockerfile -t pixie-chat-kiosk-ui:ci-arm64 --load .
 
       - name: Upload Playwright report
         if: always()

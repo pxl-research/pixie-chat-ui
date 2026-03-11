@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+target_path="/usr/share/nginx/html/env-config.js"
+
+json_escape() {
+  printf '%s' "$1" | sed \
+    -e 's/\\/\\\\/g' \
+    -e 's/"/\\"/g' \
+    -e ':a;N;$!ba;s/\n/\\n/g' \
+    -e 's/\r/\\r/g'
+}
+
+write_prop() {
+  key="$1"
+  value="$2"
+
+  if [ -z "$value" ]; then
+    return 0
+  fi
+
+  printf '  %s: "%s",\n' "$key" "$(json_escape "$value")" >> "$target_path"
+}
+
+: > "$target_path"
+printf 'window.__ENV__ = Object.assign({}, window.__ENV__, {\n' >> "$target_path"
+
+write_prop "QUESTIONER_API_BASE_URL" "${QUESTIONER_API_BASE_URL:-${VITE_QUESTIONER_API_BASE_URL:-/questioner}}"
+write_prop "PIXIE_QUESTIONER_CASE_ID" "${PIXIE_QUESTIONER_CASE_ID:-${ACTIVE_CLIENT_ID:-${VITE_QUESTIONER_CASE_ID:-}}}"
+write_prop "KIOSK_IDLE_TIMEOUT_MS" "${KIOSK_IDLE_TIMEOUT_MS:-${VITE_KIOSK_IDLE_TIMEOUT_MS:-}}"
+write_prop "KIOSK_RESET_DELAY_MS" "${KIOSK_RESET_DELAY_MS:-${VITE_KIOSK_RESET_DELAY_MS:-}}"
+write_prop "ACTIVE_CLIENT_DISPLAY_NAME" "${ACTIVE_CLIENT_DISPLAY_NAME:-${VITE_ACTIVE_CLIENT_DISPLAY_NAME:-}}"
+write_prop "ACTIVE_CLIENT_PRIMARY_COLOR" "${ACTIVE_CLIENT_PRIMARY_COLOR:-${VITE_ACTIVE_CLIENT_PRIMARY_COLOR:-}}"
+write_prop "ACTIVE_CLIENT_LOGO_URL" "${ACTIVE_CLIENT_LOGO_URL:-${VITE_ACTIVE_CLIENT_LOGO_URL:-}}"
+write_prop "ACTIVE_CLIENT_LOGO_NO_TEXT_URL" "${ACTIVE_CLIENT_LOGO_NO_TEXT_URL:-${VITE_ACTIVE_CLIENT_LOGO_NO_TEXT_URL:-}}"
+write_prop "ACTIVE_CLIENT_BACKGROUND_IMAGE_URL" "${ACTIVE_CLIENT_BACKGROUND_IMAGE_URL:-${VITE_ACTIVE_CLIENT_BACKGROUND_IMAGE_URL:-}}"
+write_prop "ACTIVE_CLIENT_WELCOME_MESSAGE" "${ACTIVE_CLIENT_WELCOME_MESSAGE:-${VITE_ACTIVE_CLIENT_WELCOME_MESSAGE:-}}"
+write_prop "ACTIVE_CLIENT_CHAT_HEADER_TITLE" "${ACTIVE_CLIENT_CHAT_HEADER_TITLE:-${VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE:-}}"
+write_prop "KIOSK_START_LABEL" "${KIOSK_START_LABEL:-${VITE_KIOSK_START_LABEL:-}}"
+write_prop "KIOSK_HELP_TEXT" "${KIOSK_HELP_TEXT:-${VITE_KIOSK_HELP_TEXT:-}}"
+
+printf '});\n' >> "$target_path"
+
+echo "[runtime-config] Wrote env-config.js with QUESTIONER_API_BASE_URL=${QUESTIONER_API_BASE_URL:-${VITE_QUESTIONER_API_BASE_URL:-/questioner}} PIXIE_QUESTIONER_CASE_ID=${PIXIE_QUESTIONER_CASE_ID:-${ACTIVE_CLIENT_ID:-${VITE_QUESTIONER_CASE_ID:-}}}"

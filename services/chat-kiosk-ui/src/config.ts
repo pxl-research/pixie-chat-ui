@@ -20,6 +20,22 @@ export type KioskCopyConfig = {
   helpText: string;
 };
 
+type KioskRuntimeEnv = {
+  QUESTIONER_API_BASE_URL?: string;
+  PIXIE_QUESTIONER_CASE_ID?: string;
+  KIOSK_IDLE_TIMEOUT_MS?: string;
+  KIOSK_RESET_DELAY_MS?: string;
+  ACTIVE_CLIENT_DISPLAY_NAME?: string;
+  ACTIVE_CLIENT_PRIMARY_COLOR?: string;
+  ACTIVE_CLIENT_LOGO_URL?: string;
+  ACTIVE_CLIENT_LOGO_NO_TEXT_URL?: string;
+  ACTIVE_CLIENT_BACKGROUND_IMAGE_URL?: string;
+  ACTIVE_CLIENT_WELCOME_MESSAGE?: string;
+  ACTIVE_CLIENT_CHAT_HEADER_TITLE?: string;
+  KIOSK_START_LABEL?: string;
+  KIOSK_HELP_TEXT?: string;
+};
+
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 const DEFAULT_RESET_DELAY_MS = 10_000;
 const DEFAULT_KIOSK_COPY: KioskCopyConfig = {
@@ -39,16 +55,43 @@ const DEFAULT_KIOSK_COPY: KioskCopyConfig = {
   helpText: "Tik op start en laat je stap voor stap begeleiden.",
 };
 
-function readRequiredEnv(name: keyof ImportMetaEnv): string {
-  const value = import.meta.env[name];
-  if (!value || !value.trim()) {
-    throw new Error(`Missing required environment variable: ${name}`);
+function readRuntimeEnv(name: keyof KioskRuntimeEnv): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
   }
+
+  const value = window.__ENV__?.[name];
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
   return value.trim();
 }
 
-function readNumberEnv(name: keyof ImportMetaEnv, fallback: number): number {
-  const rawValue = import.meta.env[name];
+function readBuildEnv(name: keyof ImportMetaEnv): string | undefined {
+  const value = import.meta.env[name];
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+
+  return value.trim();
+}
+
+function readRequiredConfig(runtimeName: keyof KioskRuntimeEnv, buildName: keyof ImportMetaEnv): string {
+  const value = readRuntimeEnv(runtimeName) ?? readBuildEnv(buildName);
+  if (!value) {
+    throw new Error(`Missing required kiosk configuration: ${runtimeName} or ${buildName}`);
+  }
+
+  return value;
+}
+
+function readNumberConfig(
+  runtimeName: keyof KioskRuntimeEnv,
+  buildName: keyof ImportMetaEnv,
+  fallback: number,
+): number {
+  const rawValue = readRuntimeEnv(runtimeName) ?? readBuildEnv(buildName);
   if (!rawValue || !rawValue.trim()) {
     return fallback;
   }
@@ -61,59 +104,95 @@ function readNumberEnv(name: keyof ImportMetaEnv, fallback: number): number {
   return parsed;
 }
 
-function readOptionalTextEnv(name: keyof ImportMetaEnv, fallback: string): string {
-  const rawValue = import.meta.env[name];
-  if (!rawValue || !rawValue.trim()) {
-    return fallback;
-  }
-
-  return rawValue.trim();
+function readOptionalTextConfig(
+  runtimeName: keyof KioskRuntimeEnv,
+  buildName: keyof ImportMetaEnv,
+  fallback: string,
+): string {
+  return readRuntimeEnv(runtimeName) ?? readBuildEnv(buildName) ?? fallback;
 }
 
 export function readKioskConfig(): KioskConfig {
   return {
-    questionerBaseUrl: readRequiredEnv("VITE_QUESTIONER_API_BASE_URL").replace(/\/$/, ""),
-    caseId: readRequiredEnv("VITE_QUESTIONER_CASE_ID"),
-    idleTimeoutMs: readNumberEnv("VITE_KIOSK_IDLE_TIMEOUT_MS", DEFAULT_IDLE_TIMEOUT_MS),
-    resetDelayMs: readNumberEnv("VITE_KIOSK_RESET_DELAY_MS", DEFAULT_RESET_DELAY_MS),
+    questionerBaseUrl: readRequiredConfig(
+      "QUESTIONER_API_BASE_URL",
+      "VITE_QUESTIONER_API_BASE_URL",
+    ).replace(/\/$/, ""),
+    caseId: readRequiredConfig("PIXIE_QUESTIONER_CASE_ID", "VITE_QUESTIONER_CASE_ID"),
+    idleTimeoutMs: readNumberConfig(
+      "KIOSK_IDLE_TIMEOUT_MS",
+      "VITE_KIOSK_IDLE_TIMEOUT_MS",
+      DEFAULT_IDLE_TIMEOUT_MS,
+    ),
+    resetDelayMs: readNumberConfig(
+      "KIOSK_RESET_DELAY_MS",
+      "VITE_KIOSK_RESET_DELAY_MS",
+      DEFAULT_RESET_DELAY_MS,
+    ),
   };
 }
 
 export function readKioskTimingConfig(): Pick<KioskConfig, "idleTimeoutMs" | "resetDelayMs"> {
   return {
-    idleTimeoutMs: readNumberEnv("VITE_KIOSK_IDLE_TIMEOUT_MS", DEFAULT_IDLE_TIMEOUT_MS),
-    resetDelayMs: readNumberEnv("VITE_KIOSK_RESET_DELAY_MS", DEFAULT_RESET_DELAY_MS),
+    idleTimeoutMs: readNumberConfig(
+      "KIOSK_IDLE_TIMEOUT_MS",
+      "VITE_KIOSK_IDLE_TIMEOUT_MS",
+      DEFAULT_IDLE_TIMEOUT_MS,
+    ),
+    resetDelayMs: readNumberConfig(
+      "KIOSK_RESET_DELAY_MS",
+      "VITE_KIOSK_RESET_DELAY_MS",
+      DEFAULT_RESET_DELAY_MS,
+    ),
   };
 }
 
 export function readKioskCopyConfig(): KioskCopyConfig {
-  const displayName = readOptionalTextEnv(
+  const displayName = readOptionalTextConfig(
+    "ACTIVE_CLIENT_DISPLAY_NAME",
     "VITE_ACTIVE_CLIENT_DISPLAY_NAME",
     DEFAULT_KIOSK_COPY.displayName,
   );
-  const primaryColor = readOptionalTextEnv(
+  const primaryColor = readOptionalTextConfig(
+    "ACTIVE_CLIENT_PRIMARY_COLOR",
     "VITE_ACTIVE_CLIENT_PRIMARY_COLOR",
     DEFAULT_KIOSK_COPY.primaryColor,
   );
-  const logoUrl = readOptionalTextEnv("VITE_ACTIVE_CLIENT_LOGO_URL", DEFAULT_KIOSK_COPY.logoUrl);
-  const logoNoTextUrl = readOptionalTextEnv(
+  const logoUrl = readOptionalTextConfig(
+    "ACTIVE_CLIENT_LOGO_URL",
+    "VITE_ACTIVE_CLIENT_LOGO_URL",
+    DEFAULT_KIOSK_COPY.logoUrl,
+  );
+  const logoNoTextUrl = readOptionalTextConfig(
+    "ACTIVE_CLIENT_LOGO_NO_TEXT_URL",
     "VITE_ACTIVE_CLIENT_LOGO_NO_TEXT_URL",
     DEFAULT_KIOSK_COPY.logoNoTextUrl,
   );
-  const backgroundImageUrl = readOptionalTextEnv(
+  const backgroundImageUrl = readOptionalTextConfig(
+    "ACTIVE_CLIENT_BACKGROUND_IMAGE_URL",
     "VITE_ACTIVE_CLIENT_BACKGROUND_IMAGE_URL",
     DEFAULT_KIOSK_COPY.backgroundImageUrl,
   );
-  const chatHeaderTitle = readOptionalTextEnv(
+  const chatHeaderTitle = readOptionalTextConfig(
+    "ACTIVE_CLIENT_CHAT_HEADER_TITLE",
     "VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE",
     DEFAULT_KIOSK_COPY.chatHeaderTitle,
   );
-  const welcomeMessage = readOptionalTextEnv(
+  const welcomeMessage = readOptionalTextConfig(
+    "ACTIVE_CLIENT_WELCOME_MESSAGE",
     "VITE_ACTIVE_CLIENT_WELCOME_MESSAGE",
     DEFAULT_KIOSK_COPY.welcomeMessage,
   );
-  const startLabel = readOptionalTextEnv("VITE_KIOSK_START_LABEL", DEFAULT_KIOSK_COPY.startLabel);
-  const helpText = readOptionalTextEnv("VITE_KIOSK_HELP_TEXT", DEFAULT_KIOSK_COPY.helpText);
+  const startLabel = readOptionalTextConfig(
+    "KIOSK_START_LABEL",
+    "VITE_KIOSK_START_LABEL",
+    DEFAULT_KIOSK_COPY.startLabel,
+  );
+  const helpText = readOptionalTextConfig(
+    "KIOSK_HELP_TEXT",
+    "VITE_KIOSK_HELP_TEXT",
+    DEFAULT_KIOSK_COPY.helpText,
+  );
 
   return {
     displayName,

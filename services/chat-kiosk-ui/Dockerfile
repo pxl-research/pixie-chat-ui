@@ -38,3 +38,5 @@ RUN npm run build
 FROM nginx:alpine
 COPY services/chat-kiosk-ui/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/services/chat-kiosk-ui/dist /usr/share/nginx/html
+COPY services/chat-kiosk-ui/scripts/inject-runtime-config.sh /docker-entrypoint.d/40-inject-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/40-inject-runtime-config.sh

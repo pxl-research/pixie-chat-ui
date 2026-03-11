@@ -1,5 +1,25 @@
 /// <reference types="vite/client" />
 
+interface RuntimeEnv {
+  QUESTIONER_API_BASE_URL?: string;
+  PIXIE_QUESTIONER_CASE_ID?: string;
+  KIOSK_IDLE_TIMEOUT_MS?: string;
+  KIOSK_RESET_DELAY_MS?: string;
+  ACTIVE_CLIENT_DISPLAY_NAME?: string;
+  ACTIVE_CLIENT_PRIMARY_COLOR?: string;
+  ACTIVE_CLIENT_LOGO_URL?: string;
+  ACTIVE_CLIENT_LOGO_NO_TEXT_URL?: string;
+  ACTIVE_CLIENT_BACKGROUND_IMAGE_URL?: string;
+  ACTIVE_CLIENT_WELCOME_MESSAGE?: string;
+  ACTIVE_CLIENT_CHAT_HEADER_TITLE?: string;
+  KIOSK_START_LABEL?: string;
+  KIOSK_HELP_TEXT?: string;
+}
+
+interface Window {
+  __ENV__?: RuntimeEnv;
+}
+
 interface ImportMetaEnv {
   readonly VITE_QUESTIONER_API_BASE_URL?: string;
   readonly VITE_QUESTIONER_CASE_ID?: string;

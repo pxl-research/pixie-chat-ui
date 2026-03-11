@@ -3,24 +3,24 @@ services:
     build:
       context: ../..
       dockerfile: services/chat-kiosk-ui/Dockerfile
-      args:
-        VITE_QUESTIONER_API_BASE_URL: /questioner
-        VITE_QUESTIONER_CASE_ID: ${VITE_QUESTIONER_CASE_ID:-cretskens}
-        VITE_KIOSK_IDLE_TIMEOUT_MS: ${VITE_KIOSK_IDLE_TIMEOUT_MS:-90000}
-        VITE_KIOSK_RESET_DELAY_MS: ${VITE_KIOSK_RESET_DELAY_MS:-10000}
-        VITE_ACTIVE_CLIENT_DISPLAY_NAME: ${VITE_ACTIVE_CLIENT_DISPLAY_NAME:-CRETSKENS}
-        VITE_ACTIVE_CLIENT_PRIMARY_COLOR: "${VITE_ACTIVE_CLIENT_PRIMARY_COLOR:-#6A1E2C}"
-        VITE_ACTIVE_CLIENT_LOGO_URL: "${VITE_ACTIVE_CLIENT_LOGO_URL:-/branding/cretskens/logo.png}"
-        VITE_ACTIVE_CLIENT_LOGO_NO_TEXT_URL: "${VITE_ACTIVE_CLIENT_LOGO_NO_TEXT_URL:-/branding/cretskens/logo_no_text.png}"
-        VITE_ACTIVE_CLIENT_BACKGROUND_IMAGE_URL: "${VITE_ACTIVE_CLIENT_BACKGROUND_IMAGE_URL:-/branding/cretskens/background.png}"
-        VITE_ACTIVE_CLIENT_WELCOME_MESSAGE: "${VITE_ACTIVE_CLIENT_WELCOME_MESSAGE:-Hallo, ik ben je Cretskens AI-assistent. Ik help je graag om de juiste wijn bij je gerecht te vinden. Vertel me wat je gaat eten, dan maak ik een duidelijke samenvatting voor gericht advies in de winkel.}"
-        VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE: "${VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE:-Cretskens Wijnassistent}"
-        VITE_KIOSK_START_LABEL: "${VITE_KIOSK_START_LABEL:-Start gesprek}"
-        VITE_KIOSK_HELP_TEXT: "${VITE_KIOSK_HELP_TEXT:-Tik op start en laat je stap voor stap begeleiden.}"
+    environment:
+      QUESTIONER_API_BASE_URL: /questioner
+      PIXIE_QUESTIONER_CASE_ID: ${PIXIE_QUESTIONER_CASE_ID:-cretskens}
+      KIOSK_IDLE_TIMEOUT_MS: ${KIOSK_IDLE_TIMEOUT_MS:-90000}
+      KIOSK_RESET_DELAY_MS: ${KIOSK_RESET_DELAY_MS:-10000}
+      ACTIVE_CLIENT_DISPLAY_NAME: ${ACTIVE_CLIENT_DISPLAY_NAME:-CRETSKENS}
+      ACTIVE_CLIENT_PRIMARY_COLOR: "${ACTIVE_CLIENT_PRIMARY_COLOR:-#6A1E2C}"
+      ACTIVE_CLIENT_LOGO_URL: "${ACTIVE_CLIENT_LOGO_URL:-/branding/cretskens/logo.png}"
+      ACTIVE_CLIENT_LOGO_NO_TEXT_URL: "${ACTIVE_CLIENT_LOGO_NO_TEXT_URL:-/branding/cretskens/logo_no_text.png}"
+      ACTIVE_CLIENT_BACKGROUND_IMAGE_URL: "${ACTIVE_CLIENT_BACKGROUND_IMAGE_URL:-/branding/cretskens/background.png}"
+      ACTIVE_CLIENT_WELCOME_MESSAGE: "${ACTIVE_CLIENT_WELCOME_MESSAGE:-Hallo, ik ben je Cretskens AI-assistent. Ik help je graag om de juiste wijn bij je gerecht te vinden. Vertel me wat je gaat eten, dan maak ik een duidelijke samenvatting voor gericht advies in de winkel.}"
+      ACTIVE_CLIENT_CHAT_HEADER_TITLE: "${ACTIVE_CLIENT_CHAT_HEADER_TITLE:-Cretskens Wijnassistent}"
+      KIOSK_START_LABEL: "${KIOSK_START_LABEL:-Start gesprek}"
+      KIOSK_HELP_TEXT: "${KIOSK_HELP_TEXT:-Tik op start en laat je stap voor stap begeleiden.}"
     ports:
       - "8080:8080"
     volumes:
-      - ${KIOSK_BRANDING_PATH:?Set KIOSK_BRANDING_PATH to the Cretskens branding directory}:/usr/share/nginx/html/branding/cretskens:ro
+      - ${KIOSK_BRANDING_PATH:?Set KIOSK_BRANDING_PATH to the active case branding directory}:/usr/share/nginx/html/branding/${PIXIE_QUESTIONER_CASE_ID:-cretskens}:ro
     networks:
       - pixie
 
