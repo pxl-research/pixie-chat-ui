@@ -1,9 +1,10 @@
 # Pixie Chat Experience
 
-Dit onderdeel van het PiXie-platform levert de merkbare chatervaring waarin klanten met hun digitale assistent praten. De repository bundelt twee lichte services:
+Dit onderdeel van het PiXie-platform levert de merkbare chatervaring waarin klanten met hun digitale assistent praten. De repository bundelt drie lichte services:
 
 - **Chat Proxy** – vormt de schakel tussen de chatinterface en Pixie Core. Hij ontvangt de vraag van de gebruiker, stuurt die door naar de juiste Pixie-service en bezorgt het antwoord terug aan de UI.
 - **Chat UI** – is de webinterface die het gesprek toont. Je personaliseert hem met de kleuren, logo’s en begroeting van jouw klant zodat de beleving naadloos in het merk past.
+- **Chat Kiosk UI** – is de afgeslankte fullscreen kioskvariant voor de Cretskens-case. Deze praat rechtstreeks met `pixie-questioner` en laat de bestaande proxyflow ongemoeid.
 
 ## Hoe dit past in PiXie
 
@@ -19,6 +20,11 @@ Zo vormt deze repository de zichtbare voorkant van een groter geheel: gebruikers
 ## Wat je als beheerder doet
 
 Je configureert de chat volledig via omgevingsvariabelen: kies de klant, stel kleur en logo in, voeg een welkomstboodschap toe en start de services. Daarna is de chat onmiddellijk beschikbaar en integreert hij vanzelf met de andere PiXie-componenten binnen je omgeving.
+
+## Deploymentvarianten
+
+- **VM + smartphonegebruikers**: gebruik de bestaande flow `chat-ui + chat-proxy + gateway`.
+- **Jetson kiosk (Cretskens)**: gebruik `services/chat-kiosk-ui`; deze frontend praat rechtstreeks met `pixie-questioner` en heeft geen proxylaag nodig.
 
 ### Routeren tussen recommender, informer en questioner
 
@@ -40,7 +46,7 @@ Voor misbruikpreventie in de proxy kun je harde limieten instellen via env vars:
 
 Wanneer `PIXIE_BACKEND_TARGET=questioner` controleert de proxy ook de contractversie via header `X-Pixie-Chat-Contract`. Standaard verwacht de proxy `chat-v2.0.0` (`PIXIE_CHAT_CONTRACT_VERSION`) en weigert hij mismatches (`STRICT_QUESTIONER_CHAT_CONTRACT=true`).
 
-Voor de UI-types staat een gegenereerd contractbestand in `services/chat-ui/src/api/generated/chatContract.ts`. Regenereren kan met:
+Voor de gedeelde UI-types staat een gegenereerd contractbestand in `shared/pixie-chat/generatedChatContract.ts`. Regenereren kan met:
 
 ```
 cd services/chat-ui

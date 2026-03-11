@@ -1,8 +1,23 @@
 import { describe, expect, it } from "vitest";
 
+import { parsePixieChatResponse } from "@pixie-chat/responseParser";
 import { parseApiResponse } from "./responseParser";
 
 describe("parseApiResponse quick replies", () => {
+  it("normalizes quick replies via the shared parser", () => {
+    const parsed = parsePixieChatResponse({
+      type: "answer",
+      text: "Kies een optie",
+      quick_replies: ["Ja", { label: "Nee", value: "no" }],
+      state: {},
+    });
+
+    expect(parsed.quickReplies).toEqual([
+      { label: "Ja", value: "Ja" },
+      { label: "Nee", value: "no" },
+    ]);
+  });
+
   it("normalizes string quick replies with trim, dedupe and max 6", () => {
     const parsed = parseApiResponse({
       type: "answer",

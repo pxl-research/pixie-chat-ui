@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -11,7 +14,7 @@
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
     "preview": "vite preview",
-    "generate:chat-contract": "npx --yes -p typescript -p openapi-typescript openapi-typescript ../../../pixie-contracts/contracts/chat/v1.1/openapi.yaml --output src/api/generated/chatContract.ts"
+    "generate:chat-contract": "npx --yes -p typescript -p openapi-typescript openapi-typescript ../../../pixie-contracts/contracts/chat/v1.1/openapi.yaml --output ../../shared/pixie-chat/generatedChatContract.ts"
   },
   "dependencies": {
     "react": "^19.1.1",

@@ -20,6 +20,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -50,11 +53,31 @@ jobs:
       - name: Build and push chat-ui image
         uses: docker/build-push-action@v6
         with:
-          context: ./services/chat-ui
+          context: .
           file: ./services/chat-ui/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-ui.outputs.tags }}
           labels: ${{ steps.meta-ui.outputs.labels }}
+
+      - name: Extract Docker metadata (chat-kiosk-ui)
+        id: meta-kiosk
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}-kiosk-ui
+          tags: |
+            type=ref,event=branch
+            type=sha
+
+      - name: Build and push chat-kiosk-ui image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/chat-kiosk-ui/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-kiosk.outputs.tags }}
+          labels: ${{ steps.meta-kiosk.outputs.labels }}
 
       - name: Extract Docker metadata (chat-proxy)
         id: meta-proxy
@@ -70,6 +93,7 @@ jobs:
         with:
           context: ./services/chat-proxy
           file: ./services/chat-proxy/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-proxy.outputs.tags }}
           labels: ${{ steps.meta-proxy.outputs.labels }}
