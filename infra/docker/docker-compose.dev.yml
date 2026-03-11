@@ -29,7 +29,8 @@ services:
   ui:
     image: ${CHAT_UI_IMAGE:-ghcr.io/pxl-research/pixie-chat-ui:main}
     build:
-      context: ../../services/chat-ui
+      context: ../..
+      dockerfile: services/chat-ui/Dockerfile
     container_name: chat-ui
     env_file: ../../.env.dev
     depends_on:

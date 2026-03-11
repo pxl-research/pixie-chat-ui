@@ -25,6 +25,7 @@ export default function App() {
           brandLabel={copy.brandLabel}
           logoUrl={copy.logoNoTextUrl || copy.logoUrl}
           title={copy.chatHeaderTitle}
+          welcomeMessage={copy.welcomeMessage}
           messages={session.messages}
           quickReplies={session.quickReplies}
           loading={session.loading}

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { QuickReplyOption } from "@pixie-chat/responseParser";
 
@@ -8,6 +8,7 @@ type ChatScreenProps = {
   brandLabel?: string;
   logoUrl?: string;
   title: string;
+  welcomeMessage?: string;
   messages: KioskMessage[];
   quickReplies: QuickReplyOption[];
   loading: boolean;
@@ -19,6 +20,7 @@ export function ChatScreen({
   brandLabel = "CRETSKENS",
   logoUrl,
   title,
+  welcomeMessage,
   messages,
   quickReplies,
   loading,
@@ -26,6 +28,18 @@ export function ChatScreen({
   onSendMessage,
 }: ChatScreenProps) {
   const [draft, setDraft] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!loading) {
+      inputRef.current?.focus();
+    }
+  }, [loading]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,7 +71,13 @@ export function ChatScreen({
 
       <div className="chat-screen__viewport">
         <div className="chat-screen__messages" role="log" aria-live="polite">
-          {messages.length === 0 ? (
+          {welcomeMessage && (
+            <article className="chat-screen__message chat-screen__message--welcome">
+              <span className="chat-screen__role">{title}</span>
+              <p>{welcomeMessage}</p>
+            </article>
+          )}
+          {messages.length === 0 && !welcomeMessage ? (
             <p className="chat-screen__empty">Typ een bericht of kies een snelle optie om te starten.</p>
           ) : (
             messages.map((message, index) => (
@@ -72,6 +92,7 @@ export function ChatScreen({
               </article>
             ))
           )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
@@ -98,6 +119,7 @@ export function ChatScreen({
           </label>
           <div className="chat-screen__composer-row">
             <input
+              ref={inputRef}
               id="chat-message"
               aria-label="Bericht"
               type="text"
