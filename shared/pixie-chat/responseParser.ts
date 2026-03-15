@@ -35,10 +35,23 @@ export type SearchResultsResponse = {
   [key: string]: unknown;
 };
 
+export type WineRecommendationItem = {
+  name: string;
+  country: string;
+  region: string;
+  aromaDescription: string;
+  tasteDescription: string;
+};
+
 export type AssistantRichContent =
   | {
       type: typeof SEARCH_RESULTS;
       results: SearchResultsResponse;
+    }
+  | {
+      type: "wine_recommendations";
+      intro: string;
+      items: WineRecommendationItem[];
     };
 
 export type PixieChatApiQuickReply =
@@ -68,6 +81,7 @@ export type PixieChatApiResponse = {
   choices?: PixieChatApiQuickReply[] | null;
   options?: PixieChatApiQuickReply[] | null;
   suggested_answers?: PixieChatApiQuickReply[] | null;
+  recommendations?: unknown;
   conversation_id?: string | null;
   conversationId?: string | null;
   state?: Record<string, unknown> | null;
@@ -201,6 +215,41 @@ function extractQuickReplies(
   return [];
 }
 
+function normalizeRecommendationArray(raw: unknown): WineRecommendationItem[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const normalized: WineRecommendationItem[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const recommendation = item as Record<string, unknown>;
+    const name = trimToNonEmptyString(recommendation.name);
+    const country = trimToNonEmptyString(recommendation.country);
+    const region = trimToNonEmptyString(recommendation.region);
+    const aromaDescription = trimToNonEmptyString(recommendation.aroma_description);
+    const tasteDescription = trimToNonEmptyString(recommendation.taste_description);
+
+    if (!name || !country || !region || !aromaDescription || !tasteDescription) {
+      continue;
+    }
+
+    normalized.push({
+      name,
+      country,
+      region,
+      aromaDescription,
+      tasteDescription,
+    });
+  }
+
+  return normalized;
+}
+
 export function parsePixieChatResponse(
   data: PixieChatApiResponse,
 ): ParsedPixieChatResponse {
@@ -275,6 +324,21 @@ export function parsePixieChatResponse(
       error = textContent ?? "Pixie backend gaf een foutmelding.";
       shouldContinueConversation = false;
       break;
+
+    case "recommendations": {
+      content = textContent ?? DEFAULT_NO_ANSWER;
+      const recommendations = normalizeRecommendationArray(dataObject?.recommendations);
+      if (recommendations.length > 0) {
+        richContent = {
+          type: "wine_recommendations",
+          intro: content,
+          items: recommendations,
+        };
+      }
+      isComplete = true;
+      shouldContinueConversation = false;
+      break;
+    }
 
     default:
       content = textContent ?? null;
