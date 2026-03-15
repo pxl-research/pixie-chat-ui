@@ -176,7 +176,9 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         }
 
         const assistantMessages: KioskMessage[] = [];
-        if (parsed.content) {
+        const hasWineRecommendations =
+          parsed.richContent?.type === "wine_recommendations";
+        if (parsed.content && !hasWineRecommendations) {
           assistantMessages.push({
             role: ROLE_ASSISTANT,
             content: parsed.content,

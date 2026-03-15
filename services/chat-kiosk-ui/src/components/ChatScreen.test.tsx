@@ -73,8 +73,8 @@ describe("ChatScreen", () => {
     );
 
     expect(
-      screen.getByText("Leuk, ik heb een paar mooie opties voor je klaargezet."),
-    ).toBeInTheDocument();
+      screen.queryByText("Leuk, ik heb een paar mooie opties voor je klaargezet."),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Domaine des Pins Sauvignon Blanc" }),
     ).toBeInTheDocument();
