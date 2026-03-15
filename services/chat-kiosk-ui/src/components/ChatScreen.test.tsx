@@ -37,8 +37,9 @@ describe("ChatScreen", () => {
     expect(onRestart).not.toHaveBeenCalled();
   });
 
-  it("renders Cretskens recommendation cards as structured results", () => {
-    render(
+  it("renders Cretskens recommendation cards as structured results", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
       <ChatScreen
         title="Cretskens Assistent"
         messages={[
@@ -81,5 +82,16 @@ describe("ChatScreen", () => {
     expect(screen.getAllByText("Geur")).toHaveLength(2);
     expect(screen.getAllByText("Smaak")).toHaveLength(2);
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(
+      container.querySelector(".chat-screen__recommendation-rail"),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector(".chat-screen__recommendation-card"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Vorige wijn" }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Volgende wijn" }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
   });
 });
