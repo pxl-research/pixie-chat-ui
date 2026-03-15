@@ -101,7 +101,7 @@ describe("useKioskSession", () => {
       await result.current.sendUserMessage("Ik zoek een frisse witte wijn");
     });
 
-    expect(result.current.phase).toBe("completed");
+    expect(result.current.phase).toBe("chatting");
     expect(result.current.recommendations).toEqual({
       intro: "Leuk, ik heb een paar mooie opties voor je klaargezet.",
       items: [

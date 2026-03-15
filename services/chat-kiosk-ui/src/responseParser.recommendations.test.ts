@@ -30,7 +30,7 @@ describe("parsePixieChatResponse recommendations", () => {
     expect(parsed.content).toBe(
       "Leuk, ik heb een paar mooie opties voor je klaargezet.",
     );
-    expect(parsed.isComplete).toBe(true);
+    expect(parsed.isComplete).toBe(false);
     expect(parsed.quickReplies).toEqual([]);
     expect(parsed.richContent).toEqual({
       type: "wine_recommendations",

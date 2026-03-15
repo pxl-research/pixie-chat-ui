@@ -335,7 +335,7 @@ export function parsePixieChatResponse(
           items: recommendations,
         };
       }
-      isComplete = true;
+      isComplete = false;
       shouldContinueConversation = false;
       break;
     }
