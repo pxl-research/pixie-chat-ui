@@ -125,7 +125,6 @@ export function ChatScreen({
               aria-label="Wijnsuggesties"
             >
               <div className="chat-screen__recommendations-header">
-                <p>{recommendations.intro}</p>
                 <div className="chat-screen__recommendation-controls">
                   <button
                     type="button"

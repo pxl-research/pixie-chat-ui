@@ -102,6 +102,9 @@ describe("useKioskSession", () => {
     });
 
     expect(result.current.phase).toBe("chatting");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "Ik zoek een frisse witte wijn",
+    ]);
     expect(result.current.recommendations).toEqual({
       intro: "Leuk, ik heb een paar mooie opties voor je klaargezet.",
       items: [
