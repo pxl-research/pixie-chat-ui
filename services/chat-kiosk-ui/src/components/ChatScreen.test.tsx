@@ -36,4 +36,62 @@ describe("ChatScreen", () => {
     expect(onSendMessage).toHaveBeenNthCalledWith(2, "yes");
     expect(onRestart).not.toHaveBeenCalled();
   });
+
+  it("renders Cretskens recommendation cards as structured results", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ChatScreen
+        title="Cretskens Assistent"
+        messages={[
+          { role: "assistant", content: "Welkom bij Cretskens" },
+          { role: "user", content: "Ik zoek een frisse witte wijn" },
+        ]}
+        recommendations={{
+          intro: "Leuk, ik heb een paar mooie opties voor je klaargezet.",
+          items: [
+            {
+              name: "Domaine des Pins Sauvignon Blanc",
+              country: "Frankrijk",
+              region: "Loire",
+              aromaDescription: "Citrus en witte bloemen",
+              tasteDescription: "Fris en strak",
+            },
+            {
+              name: "Casa Azul Verdejo",
+              country: "Spanje",
+              region: "Rueda",
+              aromaDescription: "Tropisch fruit en venkel",
+              tasteDescription: "Droog en rond",
+            },
+          ],
+        }}
+        quickReplies={[]}
+        loading={false}
+        onRestart={vi.fn()}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Leuk, ik heb een paar mooie opties voor je klaargezet."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Domaine des Pins Sauvignon Blanc" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Frankrijk · Loire")).toBeInTheDocument();
+    expect(screen.getAllByText("Geur")).toHaveLength(2);
+    expect(screen.getAllByText("Smaak")).toHaveLength(2);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(
+      container.querySelector(".chat-screen__recommendation-rail"),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector(".chat-screen__recommendation-card"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Vorige wijn" }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Volgende wijn" }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+  });
 });

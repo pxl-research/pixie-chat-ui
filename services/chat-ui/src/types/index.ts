@@ -1,4 +1,12 @@
 import type { Role } from "../constants";
+import type { AssistantRichContent } from "@pixie-chat/responseParser";
+
+export type {
+  SearchResultAttribute,
+  SearchResultItem,
+  SearchResultsResponse,
+  AssistantRichContent as SharedAssistantRichContent,
+} from "@pixie-chat/responseParser";
 
 export type ChatRole = Role;
 
@@ -16,28 +24,4 @@ export type ChatMessage = {
   variant?: MessageVariant;
 };
 
-export type SearchResultAttribute = {
-  name: string;
-  label?: string;
-  value: unknown;
-};
-
-export type SearchResultItem = {
-  brand?: string;
-  price?: number;
-  availability?: boolean;
-  attributes?: SearchResultAttribute[];
-};
-
-export type SearchResultsResponse = {
-  total?: number;
-  count?: number;
-  items?: SearchResultItem[];
-  [key: string]: unknown;
-};
-
-export type AssistantRichContent =
-  | {
-      type: "search-results";
-      results: SearchResultsResponse;
-    };
+export type { AssistantRichContent };

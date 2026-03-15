@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { QuickReplyOption } from "@pixie-chat/responseParser";
 
-import type { KioskMessage } from "../hooks/useKioskSession";
+import type { KioskMessage, KioskRecommendations } from "../hooks/useKioskSession";
 
 type ChatScreenProps = {
   brandLabel?: string;
@@ -10,6 +10,7 @@ type ChatScreenProps = {
   title: string;
   welcomeMessage?: string;
   messages: KioskMessage[];
+  recommendations?: KioskRecommendations | null;
   quickReplies: QuickReplyOption[];
   loading: boolean;
   onRestart: () => void;
@@ -22,14 +23,17 @@ export function ChatScreen({
   title,
   welcomeMessage,
   messages,
+  recommendations,
   quickReplies,
   loading,
   onRestart,
   onSendMessage,
 }: ChatScreenProps) {
   const [draft, setDraft] = useState("");
+  const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recommendationCardRefs = useRef<Array<HTMLElement | null>>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,6 +44,22 @@ export function ChatScreen({
       inputRef.current?.focus();
     }
   }, [loading]);
+
+  useEffect(() => {
+    setActiveRecommendationIndex(0);
+  }, [recommendations]);
+
+  useEffect(() => {
+    if (!recommendations || recommendations.items.length === 0) {
+      return;
+    }
+
+    recommendationCardRefs.current[activeRecommendationIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeRecommendationIndex, recommendations]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,6 +119,77 @@ export function ChatScreen({
               </article>
             ))
           )}
+          {recommendations && recommendations.items.length > 0 ? (
+            <section
+              className="chat-screen__recommendations"
+              aria-label="Wijnsuggesties"
+            >
+              <div className="chat-screen__recommendations-header">
+                <p>{recommendations.intro}</p>
+                <div className="chat-screen__recommendation-controls">
+                  <button
+                    type="button"
+                    className="chat-screen__recommendation-nav"
+                    onClick={() =>
+                      setActiveRecommendationIndex((current) => Math.max(0, current - 1))
+                    }
+                    disabled={activeRecommendationIndex === 0}
+                    aria-label="Vorige wijn"
+                  >
+                    Vorige
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-screen__recommendation-nav"
+                    onClick={() =>
+                      setActiveRecommendationIndex((current) =>
+                        Math.min(recommendations.items.length - 1, current + 1),
+                      )
+                    }
+                    disabled={
+                      activeRecommendationIndex === recommendations.items.length - 1
+                    }
+                    aria-label="Volgende wijn"
+                  >
+                    Volgende
+                  </button>
+                </div>
+                <span className="chat-screen__recommendation-progress">
+                  {activeRecommendationIndex + 1} / {recommendations.items.length}
+                </span>
+              </div>
+              <div className="chat-screen__recommendation-rail">
+                {recommendations.items.map((item, index) => (
+                  <article
+                    key={`${item.name}-${item.country}-${item.region}`}
+                    className={`chat-screen__recommendation-card${
+                      index === activeRecommendationIndex
+                        ? " chat-screen__recommendation-card--active"
+                        : ""
+                    }`}
+                    ref={(element) => {
+                      recommendationCardRefs.current[index] = element;
+                    }}
+                  >
+                    <h2 className="chat-screen__recommendation-name">{item.name}</h2>
+                    <p className="chat-screen__recommendation-origin">
+                      {item.country} {"\u00b7"} {item.region}
+                    </p>
+                    <div className="chat-screen__recommendation-sensory-grid">
+                      <section className="chat-screen__recommendation-sensory-block">
+                        <span className="chat-screen__recommendation-label">Geur</span>
+                        <p>{item.aromaDescription}</p>
+                      </section>
+                      <section className="chat-screen__recommendation-sensory-block">
+                        <span className="chat-screen__recommendation-label">Smaak</span>
+                        <p>{item.tasteDescription}</p>
+                      </section>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <div ref={messagesEndRef} />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { ROLE_ASSISTANT, ROLE_USER } from "@pixie-chat/constants";
 import {
   parsePixieChatResponse,
   type QuickReplyOption,
+  type WineRecommendationItem,
 } from "@pixie-chat/responseParser";
 
 import {
@@ -23,6 +24,11 @@ export type KioskMessage = {
   role: typeof ROLE_USER | typeof ROLE_ASSISTANT;
   content: string;
   variant?: "summary";
+};
+
+export type KioskRecommendations = {
+  intro: string;
+  items: WineRecommendationItem[];
 };
 
 type SendQuestionerMessage = (
@@ -48,6 +54,8 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   const sendMessage = options.sendMessage ?? sendQuestionerMessage;
   const [phase, setPhase] = useState<KioskPhase>("start");
   const [messages, setMessages] = useState<KioskMessage[]>([]);
+  const [recommendations, setRecommendations] =
+    useState<KioskRecommendations | null>(null);
   const [quickReplies, setQuickReplies] = useState<QuickReplyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +83,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     clearCompletedTimeout();
     setPhase("start");
     setMessages([]);
+    setRecommendations(null);
     setQuickReplies([]);
     setLoading(false);
     setError(null);
@@ -109,6 +118,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   const startConversation = useCallback(() => {
     clearCompletedTimeout();
     setMessages([]);
+    setRecommendations(null);
     setQuickReplies([]);
     setError(null);
     setLoading(false);
@@ -131,6 +141,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
       setPhase("chatting");
       setLoading(true);
       setError(null);
+      setRecommendations(null);
       setQuickReplies([]);
       setSessionId(activeSessionId);
       clearCompletedTimeout();
@@ -155,6 +166,14 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         setSessionId(parsed.conversationId ?? activeSessionId);
         setConversationState(parsed.state ?? {});
         setQuickReplies(parsed.quickReplies);
+        if (parsed.richContent?.type === "wine_recommendations") {
+          setRecommendations({
+            intro: parsed.richContent.intro,
+            items: parsed.richContent.items,
+          });
+        } else {
+          setRecommendations(null);
+        }
 
         const assistantMessages: KioskMessage[] = [];
         if (parsed.content) {
@@ -193,6 +212,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         clearIdleTimeout();
         clearCompletedTimeout();
         setPhase("error");
+        setRecommendations(null);
         setQuickReplies([]);
         setError(
           caughtError instanceof Error ? caughtError.message : "De kioskservice is tijdelijk onbereikbaar.",
@@ -216,6 +236,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   return {
     phase,
     messages,
+    recommendations,
     quickReplies,
     loading,
     error,
