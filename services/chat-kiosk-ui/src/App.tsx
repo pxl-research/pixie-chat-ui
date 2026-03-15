@@ -27,6 +27,7 @@ export default function App() {
           title={copy.chatHeaderTitle}
           welcomeMessage={copy.welcomeMessage}
           messages={session.messages}
+          recommendations={session.recommendations}
           quickReplies={session.quickReplies}
           loading={session.loading}
           onRestart={session.resetConversation}

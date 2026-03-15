@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { QuickReplyOption } from "@pixie-chat/responseParser";
 
-import type { KioskMessage } from "../hooks/useKioskSession";
+import type { KioskMessage, KioskRecommendations } from "../hooks/useKioskSession";
 
 type ChatScreenProps = {
   brandLabel?: string;
@@ -10,6 +10,7 @@ type ChatScreenProps = {
   title: string;
   welcomeMessage?: string;
   messages: KioskMessage[];
+  recommendations?: KioskRecommendations | null;
   quickReplies: QuickReplyOption[];
   loading: boolean;
   onRestart: () => void;
@@ -22,6 +23,7 @@ export function ChatScreen({
   title,
   welcomeMessage,
   messages,
+  recommendations,
   quickReplies,
   loading,
   onRestart,
@@ -99,6 +101,42 @@ export function ChatScreen({
               </article>
             ))
           )}
+          {recommendations && recommendations.items.length > 0 ? (
+            <section
+              className="chat-screen__recommendations"
+              aria-label="Wijnsuggesties"
+            >
+              <div className="chat-screen__recommendations-header">
+                <p>{recommendations.intro}</p>
+                <span className="chat-screen__recommendation-progress">
+                  1 / {recommendations.items.length}
+                </span>
+              </div>
+              <div className="chat-screen__recommendation-rail">
+                {recommendations.items.map((item) => (
+                  <article
+                    key={`${item.name}-${item.country}-${item.region}`}
+                    className="chat-screen__recommendation-card"
+                  >
+                    <h2 className="chat-screen__recommendation-name">{item.name}</h2>
+                    <p className="chat-screen__recommendation-origin">
+                      {item.country} {"\u00b7"} {item.region}
+                    </p>
+                    <div className="chat-screen__recommendation-sensory-grid">
+                      <section className="chat-screen__recommendation-sensory-block">
+                        <span className="chat-screen__recommendation-label">Geur</span>
+                        <p>{item.aromaDescription}</p>
+                      </section>
+                      <section className="chat-screen__recommendation-sensory-block">
+                        <span className="chat-screen__recommendation-label">Smaak</span>
+                        <p>{item.tasteDescription}</p>
+                      </section>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <div ref={messagesEndRef} />
         </div>
       </div>
