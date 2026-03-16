@@ -23,6 +23,43 @@ describe("ChatScreen", () => {
     expect(container.querySelectorAll(".chat-screen__typing-dot")).toHaveLength(3);
   });
 
+  it("scrolls to the bottom when the assistant typing bubble appears", () => {
+    const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const messages = [{ role: "user" as const, content: "Ik zoek een witte wijn" }];
+
+    try {
+      const { rerender } = render(
+        <ChatScreen
+          title="Cretskens Assistent"
+          messages={messages}
+          quickReplies={[]}
+          loading={false}
+          onRestart={vi.fn()}
+          onSendMessage={vi.fn()}
+        />,
+      );
+
+      scrollIntoView.mockClear();
+
+      rerender(
+        <ChatScreen
+          title="Cretskens Assistent"
+          messages={messages}
+          quickReplies={[]}
+          loading
+          onRestart={vi.fn()}
+          onSendMessage={vi.fn()}
+        />,
+      );
+
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
   it("keeps the kiosk input blank and disables browser hints", () => {
     render(
       <ChatScreen
