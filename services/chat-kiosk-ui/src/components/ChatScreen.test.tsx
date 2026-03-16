@@ -60,6 +60,46 @@ describe("ChatScreen", () => {
     }
   });
 
+  it("scrolls the message container when the assistant response appears", () => {
+    const originalScrollTo = window.HTMLElement.prototype.scrollTo;
+    const scrollTo = vi.fn();
+    window.HTMLElement.prototype.scrollTo = scrollTo;
+    const messages = [{ role: "user" as const, content: "Ik zoek een witte wijn" }];
+
+    try {
+      const { rerender } = render(
+        <ChatScreen
+          title="Cretskens Assistent"
+          messages={messages}
+          quickReplies={[]}
+          loading
+          onRestart={vi.fn()}
+          onSendMessage={vi.fn()}
+        />,
+      );
+
+      scrollTo.mockClear();
+
+      rerender(
+        <ChatScreen
+          title="Cretskens Assistent"
+          messages={[
+            ...messages,
+            { role: "assistant", content: "Probeer eens een frisse Verdejo." },
+          ]}
+          quickReplies={[]}
+          loading={false}
+          onRestart={vi.fn()}
+          onSendMessage={vi.fn()}
+        />,
+      );
+
+      expect(scrollTo).toHaveBeenCalled();
+    } finally {
+      window.HTMLElement.prototype.scrollTo = originalScrollTo;
+    }
+  });
+
   it("keeps the kiosk input blank and disables browser hints", () => {
     render(
       <ChatScreen

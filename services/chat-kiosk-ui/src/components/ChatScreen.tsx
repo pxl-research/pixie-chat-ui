@@ -31,13 +31,22 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const [draft, setDraft] = useState("");
   const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recommendationCardRefs = useRef<Array<HTMLElement | null>>([]);
 
   useEffect(() => {
+    const messagesContainer = messagesContainerRef.current;
+    if (messagesContainer && typeof messagesContainer.scrollTo === "function") {
+      messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, recommendations]);
 
   useEffect(() => {
     if (!loading) {
@@ -97,7 +106,7 @@ export function ChatScreen({
       </header>
 
       <div className="chat-screen__viewport">
-        <div className="chat-screen__messages" role="log" aria-live="polite">
+        <div ref={messagesContainerRef} className="chat-screen__messages" role="log" aria-live="polite">
           {welcomeMessage && (
             <article className="chat-screen__message chat-screen__message--welcome">
               <span className="chat-screen__role">{title}</span>
