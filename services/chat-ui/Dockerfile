@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app/services/chat-ui
 COPY services/chat-ui/package.json services/chat-ui/package-lock.json ./
 RUN npm ci
