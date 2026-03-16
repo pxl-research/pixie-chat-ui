@@ -5,6 +5,24 @@ import { describe, expect, it, vi } from "vitest";
 import { ChatScreen } from "./ChatScreen";
 
 describe("ChatScreen", () => {
+  it("renders a three-dot typing indicator while loading", () => {
+    const { container } = render(
+      <ChatScreen
+        title="Cretskens Assistent"
+        messages={[{ role: "user", content: "Ik zoek een witte wijn" }]}
+        quickReplies={[]}
+        loading
+        onRestart={vi.fn()}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("status", { name: "Cretskens Assistent is aan het typen" }),
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll(".chat-screen__typing-dot")).toHaveLength(3);
+  });
+
   it("submits typed messages and quick replies", async () => {
     const user = userEvent.setup();
     const onSendMessage = vi.fn(async () => undefined);

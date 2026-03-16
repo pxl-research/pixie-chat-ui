@@ -119,6 +119,20 @@ export function ChatScreen({
               </article>
             ))
           )}
+          {loading ? (
+            <article className="chat-screen__message chat-screen__message--assistant chat-screen__message--typing">
+              <span className="chat-screen__role">{title}</span>
+              <div
+                className="chat-screen__typing-indicator"
+                aria-label={`${title} is aan het typen`}
+                role="status"
+              >
+                <span className="chat-screen__typing-dot" />
+                <span className="chat-screen__typing-dot" />
+                <span className="chat-screen__typing-dot" />
+              </div>
+            </article>
+          ) : null}
           {recommendations && recommendations.items.length > 0 ? (
             <section
               className="chat-screen__recommendations"
