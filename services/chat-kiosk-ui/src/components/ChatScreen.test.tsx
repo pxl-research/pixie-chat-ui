@@ -23,6 +23,28 @@ describe("ChatScreen", () => {
     expect(container.querySelectorAll(".chat-screen__typing-dot")).toHaveLength(3);
   });
 
+  it("keeps the kiosk input blank and disables browser hints", () => {
+    render(
+      <ChatScreen
+        title="Cretskens Assistent"
+        messages={[]}
+        quickReplies={[]}
+        loading={false}
+        onRestart={vi.fn()}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Bericht" });
+
+    expect(input).toHaveValue("");
+    expect(input).not.toHaveAttribute("placeholder");
+    expect(input).toHaveAttribute("autocomplete", "off");
+    expect(input).toHaveAttribute("autocorrect", "off");
+    expect(input).toHaveAttribute("autocapitalize", "off");
+    expect(input).toHaveAttribute("spellcheck", "false");
+  });
+
   it("submits typed messages and quick replies", async () => {
     const user = userEvent.setup();
     const onSendMessage = vi.fn(async () => undefined);

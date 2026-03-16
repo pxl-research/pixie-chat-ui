@@ -234,10 +234,13 @@ export function ChatScreen({
               id="chat-message"
               aria-label="Bericht"
               type="text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               disabled={loading}
-              placeholder={loading ? "Antwoord laden..." : "Typ je bericht"}
             />
             <button
               type="submit"
