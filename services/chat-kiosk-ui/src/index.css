@@ -120,6 +120,26 @@ input:focus-visible {
   opacity: 0.7;
 }
 
+.kiosk-screen__secondary-logo {
+  width: min(11rem, 38vw);
+  max-width: 100%;
+  margin: 0 auto 0.75rem;
+  object-fit: contain;
+}
+
+.kiosk-screen__disclaimer {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0.5rem auto 0;
+  padding: 0.45rem 1.25rem;
+  border-radius: 0.4rem;
+  background: rgba(160, 160, 160, 0.18);
+  color: rgba(247, 239, 227, 0.52);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .kiosk-screen__title {
   margin: 0 0 2rem;
   font-size: clamp(2.8rem, 6vw, 5.9rem);

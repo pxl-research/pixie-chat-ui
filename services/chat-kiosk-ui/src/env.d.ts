@@ -12,8 +12,10 @@ interface RuntimeEnv {
   ACTIVE_CLIENT_BACKGROUND_IMAGE_URL?: string;
   ACTIVE_CLIENT_WELCOME_MESSAGE?: string;
   ACTIVE_CLIENT_CHAT_HEADER_TITLE?: string;
+  ACTIVE_CLIENT_SECONDARY_LOGO_URL?: string;
   KIOSK_START_LABEL?: string;
   KIOSK_HELP_TEXT?: string;
+  KIOSK_DISCLAIMER_TEXT?: string;
 }
 
 interface Window {
@@ -32,6 +34,8 @@ interface ImportMetaEnv {
   readonly VITE_ACTIVE_CLIENT_BACKGROUND_IMAGE_URL?: string;
   readonly VITE_ACTIVE_CLIENT_WELCOME_MESSAGE?: string;
   readonly VITE_ACTIVE_CLIENT_CHAT_HEADER_TITLE?: string;
+  readonly VITE_ACTIVE_CLIENT_SECONDARY_LOGO_URL?: string;
   readonly VITE_KIOSK_START_LABEL?: string;
   readonly VITE_KIOSK_HELP_TEXT?: string;
+  readonly VITE_KIOSK_DISCLAIMER_TEXT?: string;
 }

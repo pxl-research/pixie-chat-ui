@@ -57,6 +57,8 @@ export default function App() {
         <StartScreen
           brandLabel={copy.brandLabel}
           logoUrl={copy.logoUrl}
+          secondaryLogoUrl={copy.secondaryLogoUrl}
+          disclaimerText={copy.disclaimerText}
           title={copy.welcomeTitle}
           body={copy.welcomeBody}
           startLabel={copy.startLabel}

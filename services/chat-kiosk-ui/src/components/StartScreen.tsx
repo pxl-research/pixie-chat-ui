@@ -1,6 +1,8 @@
 type StartScreenProps = {
   brandLabel: string;
   logoUrl?: string;
+  secondaryLogoUrl?: string;
+  disclaimerText?: string;
   title: string;
   body: string;
   startLabel: string;
@@ -11,6 +13,8 @@ type StartScreenProps = {
 export function StartScreen({
   brandLabel,
   logoUrl,
+  secondaryLogoUrl,
+  disclaimerText,
   title,
   body,
   startLabel,
@@ -23,9 +27,16 @@ export function StartScreen({
         {logoUrl ? (
           <img className="kiosk-screen__logo" src={logoUrl} alt={brandLabel} />
         ) : null}
-        <p className="kiosk-screen__eyebrow">{brandLabel}</p>
+        {secondaryLogoUrl ? (
+          <img className="kiosk-screen__secondary-logo" src={secondaryLogoUrl} alt={brandLabel} />
+        ) : (
+          <p className="kiosk-screen__eyebrow">{brandLabel}</p>
+        )}
         <h1 className="kiosk-screen__title">{title}</h1>
         <p className="kiosk-screen__body">{body}</p>
+        {disclaimerText ? (
+          <p className="kiosk-screen__disclaimer">{disclaimerText}</p>
+        ) : null}
       </div>
       <div className="kiosk-screen__footer">
         <p className="kiosk-screen__hint">{helpText}</p>

@@ -15,8 +15,10 @@ services:
       ACTIVE_CLIENT_BACKGROUND_IMAGE_URL: "${ACTIVE_CLIENT_BACKGROUND_IMAGE_URL:-/branding/cretskens/background.png}"
       ACTIVE_CLIENT_WELCOME_MESSAGE: "${ACTIVE_CLIENT_WELCOME_MESSAGE:-Hallo, ik ben je Cretskens AI-assistent. Ik help je graag om de juiste wijn bij je gerecht te vinden. Vertel me wat je gaat eten, dan maak ik een duidelijke samenvatting voor gericht advies in de winkel.}"
       ACTIVE_CLIENT_CHAT_HEADER_TITLE: "${ACTIVE_CLIENT_CHAT_HEADER_TITLE:-Cretskens Wijnassistent}"
+      ACTIVE_CLIENT_SECONDARY_LOGO_URL: "${ACTIVE_CLIENT_SECONDARY_LOGO_URL:-/branding/cretskens/secondary_logo.svg}"
       KIOSK_START_LABEL: "${KIOSK_START_LABEL:-Start gesprek}"
       KIOSK_HELP_TEXT: "${KIOSK_HELP_TEXT:-Tik op start en laat je stap voor stap begeleiden.}"
+      KIOSK_DISCLAIMER_TEXT: "${KIOSK_DISCLAIMER_TEXT:-Alcohol schaadt de gezondheid}"
     ports:
       - "8080:8080"
     volumes:

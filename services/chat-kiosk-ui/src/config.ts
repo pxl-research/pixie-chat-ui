@@ -13,6 +13,8 @@ export type KioskCopyConfig = {
   backgroundImageUrl: string;
   chatHeaderTitle: string;
   welcomeMessage: string;
+  secondaryLogoUrl?: string;
+  disclaimerText?: string;
   brandLabel: string;
   welcomeTitle: string;
   welcomeBody: string;
@@ -32,8 +34,10 @@ type KioskRuntimeEnv = {
   ACTIVE_CLIENT_BACKGROUND_IMAGE_URL?: string;
   ACTIVE_CLIENT_WELCOME_MESSAGE?: string;
   ACTIVE_CLIENT_CHAT_HEADER_TITLE?: string;
+  ACTIVE_CLIENT_SECONDARY_LOGO_URL?: string;
   KIOSK_START_LABEL?: string;
   KIOSK_HELP_TEXT?: string;
+  KIOSK_DISCLAIMER_TEXT?: string;
 };
 
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
@@ -193,6 +197,12 @@ export function readKioskCopyConfig(): KioskCopyConfig {
     "VITE_KIOSK_HELP_TEXT",
     DEFAULT_KIOSK_COPY.helpText,
   );
+  const secondaryLogoUrl =
+    readRuntimeEnv("ACTIVE_CLIENT_SECONDARY_LOGO_URL") ??
+    readBuildEnv("VITE_ACTIVE_CLIENT_SECONDARY_LOGO_URL");
+  const disclaimerText =
+    readRuntimeEnv("KIOSK_DISCLAIMER_TEXT") ??
+    readBuildEnv("VITE_KIOSK_DISCLAIMER_TEXT");
 
   return {
     displayName,
@@ -202,6 +212,8 @@ export function readKioskCopyConfig(): KioskCopyConfig {
     backgroundImageUrl,
     chatHeaderTitle,
     welcomeMessage,
+    secondaryLogoUrl,
+    disclaimerText,
     brandLabel: displayName,
     welcomeTitle: chatHeaderTitle,
     welcomeBody: welcomeMessage,
