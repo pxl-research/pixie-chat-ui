@@ -30,6 +30,7 @@ describe("readKioskCopyConfig", () => {
         "Hallo, ik ben je Cretskens AI-assistent. Ik help je graag om de juiste wijn bij je gerecht te vinden. Vertel me wat je gaat eten, dan maak ik een duidelijke samenvatting voor gericht advies in de winkel.",
       startLabel: "Start gesprek",
       helpText: "Tik op start en laat je stap voor stap begeleiden.",
+      screensaverDelayMs: 60000,
     });
   });
 
@@ -57,6 +58,7 @@ describe("readKioskCopyConfig", () => {
       welcomeBody: "Speciaal geselecteerde copy",
       startLabel: "Begin",
       helpText: "Sta dichter bij het scherm om te starten.",
+      screensaverDelayMs: 60000,
     });
   });
 
@@ -105,6 +107,7 @@ describe("readKioskCopyConfig", () => {
       welcomeBody: "Runtime welkom",
       startLabel: "Start runtime",
       helpText: "Runtime hulp",
+      screensaverDelayMs: 60000,
     });
   });
 });

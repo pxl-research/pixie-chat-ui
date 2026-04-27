@@ -3,7 +3,6 @@ export type KioskConfig = {
   caseId: string;
   idleTimeoutMs: number;
   resetDelayMs: number;
-  screensaverDelayMs: number;
 };
 
 export type KioskCopyConfig = {
@@ -17,6 +16,7 @@ export type KioskCopyConfig = {
   secondaryLogoUrl?: string;
   disclaimerText?: string;
   screensaverVideoUrl?: string;
+  screensaverDelayMs: number;
   brandLabel: string;
   welcomeTitle: string;
   welcomeBody: string;
@@ -62,6 +62,7 @@ const DEFAULT_KIOSK_COPY: KioskCopyConfig = {
     "Hallo, ik ben je Cretskens AI-assistent. Ik help je graag om de juiste wijn bij je gerecht te vinden. Vertel me wat je gaat eten, dan maak ik een duidelijke samenvatting voor gericht advies in de winkel.",
   startLabel: "Start gesprek",
   helpText: "Tik op start en laat je stap voor stap begeleiden.",
+  screensaverDelayMs: DEFAULT_SCREENSAVER_DELAY_MS,
 };
 
 function readRuntimeEnv(name: keyof KioskRuntimeEnv): string | undefined {
@@ -138,11 +139,6 @@ export function readKioskConfig(): KioskConfig {
       "VITE_KIOSK_RESET_DELAY_MS",
       DEFAULT_RESET_DELAY_MS,
     ),
-    screensaverDelayMs: readNumberConfig(
-      "KIOSK_SCREENSAVER_DELAY_MS",
-      "VITE_KIOSK_SCREENSAVER_DELAY_MS",
-      DEFAULT_SCREENSAVER_DELAY_MS,
-    ),
   };
 }
 
@@ -216,6 +212,11 @@ export function readKioskCopyConfig(): KioskCopyConfig {
   const screensaverVideoUrl =
     readRuntimeEnv("KIOSK_SCREENSAVER_VIDEO_URL") ??
     readBuildEnv("VITE_KIOSK_SCREENSAVER_VIDEO_URL");
+  const screensaverDelayMs = readNumberConfig(
+    "KIOSK_SCREENSAVER_DELAY_MS",
+    "VITE_KIOSK_SCREENSAVER_DELAY_MS",
+    DEFAULT_SCREENSAVER_DELAY_MS,
+  );
 
   return {
     displayName,
@@ -228,6 +229,7 @@ export function readKioskCopyConfig(): KioskCopyConfig {
     secondaryLogoUrl,
     disclaimerText,
     screensaverVideoUrl,
+    screensaverDelayMs,
     brandLabel: displayName,
     welcomeTitle: chatHeaderTitle,
     welcomeBody: welcomeMessage,

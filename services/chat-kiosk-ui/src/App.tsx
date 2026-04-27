@@ -5,13 +5,12 @@ import { CompletedScreen } from "./components/CompletedScreen";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { ScreensaverOverlay } from "./components/ScreensaverOverlay";
 import { StartScreen } from "./components/StartScreen";
-import { readKioskConfig, readKioskCopyConfig } from "./config";
+import { readKioskCopyConfig } from "./config";
 import { useKioskSession } from "./hooks/useKioskSession";
 
 export default function App() {
   const session = useKioskSession();
   const copy = readKioskCopyConfig();
-  const kioskConfig = readKioskConfig();
   const shellPhase =
     session.phase === "chatting"
       ? "chat"
@@ -27,8 +26,8 @@ export default function App() {
     if (!copy.screensaverVideoUrl) return;
     screensaverTimerRef.current = window.setTimeout(() => {
       setScreensaverActive(true);
-    }, kioskConfig.screensaverDelayMs);
-  }, [copy.screensaverVideoUrl, kioskConfig.screensaverDelayMs]);
+    }, copy.screensaverDelayMs);
+  }, [copy.screensaverVideoUrl, copy.screensaverDelayMs]);
 
   const disarmScreensaverTimer = useCallback(() => {
     if (screensaverTimerRef.current !== null) {
