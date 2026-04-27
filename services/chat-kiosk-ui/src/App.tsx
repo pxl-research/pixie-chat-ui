@@ -1,21 +1,56 @@
-import type { CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { ChatScreen } from "./components/ChatScreen";
 import { CompletedScreen } from "./components/CompletedScreen";
 import { ErrorScreen } from "./components/ErrorScreen";
+import { ScreensaverOverlay } from "./components/ScreensaverOverlay";
 import { StartScreen } from "./components/StartScreen";
-import { readKioskCopyConfig } from "./config";
+import { readKioskConfig, readKioskCopyConfig } from "./config";
 import { useKioskSession } from "./hooks/useKioskSession";
 
 export default function App() {
   const session = useKioskSession();
   const copy = readKioskCopyConfig();
+  const kioskConfig = readKioskConfig();
   const shellPhase =
     session.phase === "chatting"
       ? "chat"
       : session.phase === "start"
         ? "start"
         : "status";
+
+  const [screensaverActive, setScreensaverActive] = useState(false);
+  const screensaverTimerRef = useRef<number | null>(null);
+
+  const armScreensaverTimer = useCallback(() => {
+    if (screensaverTimerRef.current !== null) clearTimeout(screensaverTimerRef.current);
+    if (!copy.screensaverVideoUrl) return;
+    screensaverTimerRef.current = window.setTimeout(() => {
+      setScreensaverActive(true);
+    }, kioskConfig.screensaverDelayMs);
+  }, [copy.screensaverVideoUrl, kioskConfig.screensaverDelayMs]);
+
+  const disarmScreensaverTimer = useCallback(() => {
+    if (screensaverTimerRef.current !== null) {
+      clearTimeout(screensaverTimerRef.current);
+      screensaverTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session.phase === "start") {
+      armScreensaverTimer();
+    } else {
+      disarmScreensaverTimer();
+      setScreensaverActive(false);
+    }
+    return disarmScreensaverTimer;
+  }, [session.phase, armScreensaverTimer, disarmScreensaverTimer]);
+
+  const dismissScreensaver = useCallback(() => {
+    setScreensaverActive(false);
+    armScreensaverTimer();
+  }, [armScreensaverTimer]);
 
   let content;
   switch (session.phase) {
@@ -76,6 +111,12 @@ export default function App() {
   return (
     <main className={`kiosk-shell kiosk-shell--${shellPhase}`} style={shellStyle}>
       {content}
+      {screensaverActive && copy.screensaverVideoUrl && (
+        <ScreensaverOverlay
+          videoUrl={copy.screensaverVideoUrl}
+          onDismiss={dismissScreensaver}
+        />
+      )}
     </main>
   );
 }

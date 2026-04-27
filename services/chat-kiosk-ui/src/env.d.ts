@@ -16,6 +16,8 @@ interface RuntimeEnv {
   KIOSK_START_LABEL?: string;
   KIOSK_HELP_TEXT?: string;
   KIOSK_DISCLAIMER_TEXT?: string;
+  KIOSK_SCREENSAVER_VIDEO_URL?: string;
+  KIOSK_SCREENSAVER_DELAY_MS?: string;
 }
 
 interface Window {
@@ -38,4 +40,6 @@ interface ImportMetaEnv {
   readonly VITE_KIOSK_START_LABEL?: string;
   readonly VITE_KIOSK_HELP_TEXT?: string;
   readonly VITE_KIOSK_DISCLAIMER_TEXT?: string;
+  readonly VITE_KIOSK_SCREENSAVER_VIDEO_URL?: string;
+  readonly VITE_KIOSK_SCREENSAVER_DELAY_MS?: string;
 }

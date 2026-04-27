@@ -3,6 +3,7 @@ export type KioskConfig = {
   caseId: string;
   idleTimeoutMs: number;
   resetDelayMs: number;
+  screensaverDelayMs: number;
 };
 
 export type KioskCopyConfig = {
@@ -15,6 +16,7 @@ export type KioskCopyConfig = {
   welcomeMessage: string;
   secondaryLogoUrl?: string;
   disclaimerText?: string;
+  screensaverVideoUrl?: string;
   brandLabel: string;
   welcomeTitle: string;
   welcomeBody: string;
@@ -38,10 +40,13 @@ type KioskRuntimeEnv = {
   KIOSK_START_LABEL?: string;
   KIOSK_HELP_TEXT?: string;
   KIOSK_DISCLAIMER_TEXT?: string;
+  KIOSK_SCREENSAVER_VIDEO_URL?: string;
+  KIOSK_SCREENSAVER_DELAY_MS?: string;
 };
 
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 const DEFAULT_RESET_DELAY_MS = 10_000;
+const DEFAULT_SCREENSAVER_DELAY_MS = 60_000;
 const DEFAULT_KIOSK_COPY: KioskCopyConfig = {
   displayName: "CRETSKENS",
   primaryColor: "#6A1E2C",
@@ -133,6 +138,11 @@ export function readKioskConfig(): KioskConfig {
       "VITE_KIOSK_RESET_DELAY_MS",
       DEFAULT_RESET_DELAY_MS,
     ),
+    screensaverDelayMs: readNumberConfig(
+      "KIOSK_SCREENSAVER_DELAY_MS",
+      "VITE_KIOSK_SCREENSAVER_DELAY_MS",
+      DEFAULT_SCREENSAVER_DELAY_MS,
+    ),
   };
 }
 
@@ -203,6 +213,9 @@ export function readKioskCopyConfig(): KioskCopyConfig {
   const disclaimerText =
     readRuntimeEnv("KIOSK_DISCLAIMER_TEXT") ??
     readBuildEnv("VITE_KIOSK_DISCLAIMER_TEXT");
+  const screensaverVideoUrl =
+    readRuntimeEnv("KIOSK_SCREENSAVER_VIDEO_URL") ??
+    readBuildEnv("VITE_KIOSK_SCREENSAVER_VIDEO_URL");
 
   return {
     displayName,
@@ -214,6 +227,7 @@ export function readKioskCopyConfig(): KioskCopyConfig {
     welcomeMessage,
     secondaryLogoUrl,
     disclaimerText,
+    screensaverVideoUrl,
     brandLabel: displayName,
     welcomeTitle: chatHeaderTitle,
     welcomeBody: welcomeMessage,

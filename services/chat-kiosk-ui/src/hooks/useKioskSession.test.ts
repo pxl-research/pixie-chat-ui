@@ -8,6 +8,7 @@ const kioskConfig = {
   caseId: "cretskens",
   idleTimeoutMs: 90_000,
   resetDelayMs: 10_000,
+  screensaverDelayMs: 60_000,
 };
 
 describe("useKioskSession", () => {
