@@ -154,6 +154,52 @@ describe("ChatScreen", () => {
     expect(onRestart).not.toHaveBeenCalled();
   });
 
+  it("renders the follow-up question bubble after the recommendation cards", () => {
+    const { container } = render(
+      <ChatScreen
+        title="Cretskens Assistent"
+        messages={[
+          { role: "assistant", content: "Welkom bij Cretskens" },
+          { role: "user", content: "Ik zoek een frisse witte wijn" },
+        ]}
+        recommendations={{
+          intro: "Hier zijn mijn suggesties.",
+          items: [
+            {
+              name: "Domaine des Pins Sauvignon Blanc",
+              country: "Frankrijk",
+              region: "Loire",
+              aromaDescription: "Citrus en witte bloemen",
+              tasteDescription: "Fris en strak",
+            },
+          ],
+        }}
+        followUpQuestion="Hoe tevreden ben je met deze suggesties?"
+        quickReplies={[
+          { label: "1", value: "1" },
+          { label: "2", value: "2" },
+        ]}
+        loading={false}
+        onRestart={vi.fn()}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    const questionBubble = screen.getByText("Hoe tevreden ben je met deze suggesties?");
+    expect(questionBubble).toBeInTheDocument();
+
+    // The follow-up question bubble must appear after the recommendations section in the DOM
+    const recommendationRail = container.querySelector(".chat-screen__recommendation-rail");
+    const messagesLog = container.querySelector('[role="log"]');
+    expect(recommendationRail).toBeInTheDocument();
+    expect(messagesLog).toBeInTheDocument();
+    const allNodes = Array.from(messagesLog!.querySelectorAll("article, .chat-screen__recommendation-rail"));
+    const railIndex = allNodes.indexOf(recommendationRail as HTMLElement);
+    const questionArticle = questionBubble.closest("article");
+    const questionIndex = allNodes.indexOf(questionArticle as HTMLElement);
+    expect(questionIndex).toBeGreaterThan(railIndex);
+  });
+
   it("renders Cretskens recommendation cards as structured results", async () => {
     const user = userEvent.setup();
     const { container } = render(

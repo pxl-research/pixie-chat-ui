@@ -56,6 +56,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   const [messages, setMessages] = useState<KioskMessage[]>([]);
   const [recommendations, setRecommendations] =
     useState<KioskRecommendations | null>(null);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<QuickReplyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
   const [conversationState, setConversationState] = useState<Record<string, unknown>>({});
   const idleTimeoutRef = useRef<number | null>(null);
   const completedTimeoutRef = useRef<number | null>(null);
+  const recommendationsRef = useRef<KioskRecommendations | null>(null);
 
   const clearIdleTimeout = useCallback(() => {
     if (idleTimeoutRef.current !== null) {
@@ -84,6 +86,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     setPhase("start");
     setMessages([]);
     setRecommendations(null);
+    setFollowUpQuestion(null);
     setQuickReplies([]);
     setLoading(false);
     setError(null);
@@ -115,10 +118,15 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     [clearCompletedTimeout, clearIdleTimeout],
   );
 
+  useEffect(() => {
+    recommendationsRef.current = recommendations;
+  }, [recommendations]);
+
   const startConversation = useCallback(() => {
     clearCompletedTimeout();
     setMessages([]);
     setRecommendations(null);
+    setFollowUpQuestion(null);
     setQuickReplies([]);
     setError(null);
     setLoading(false);
@@ -137,11 +145,11 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
 
       const resolvedConfig = config ?? readKioskConfig();
       const activeSessionId = sessionId ?? createSessionId();
+      const hadRecommendations = recommendationsRef.current !== null;
 
       setPhase("chatting");
       setLoading(true);
       setError(null);
-      setRecommendations(null);
       setQuickReplies([]);
       setSessionId(activeSessionId);
       clearCompletedTimeout();
@@ -166,35 +174,47 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         setSessionId(parsed.conversationId ?? activeSessionId);
         setConversationState(parsed.state ?? {});
         setQuickReplies(parsed.quickReplies);
-        if (parsed.richContent?.type === "wine_recommendations") {
+
+        const hasWineRecommendations = parsed.richContent?.type === "wine_recommendations";
+
+        if (hasWineRecommendations && parsed.richContent?.type === "wine_recommendations") {
           setRecommendations({
             intro: parsed.richContent.intro,
             items: parsed.richContent.items,
           });
+          setFollowUpQuestion(parsed.followUpQuestionContent ?? null);
+        } else if (hadRecommendations) {
+          // Stay in feedback mode: keep recommendations visible, update follow-up question
+          if (parsed.isComplete) {
+            setFollowUpQuestion(null);
+          } else {
+            setFollowUpQuestion(parsed.content);
+          }
         } else {
           setRecommendations(null);
+          setFollowUpQuestion(null);
         }
 
         const assistantMessages: KioskMessage[] = [];
-        const hasWineRecommendations =
-          parsed.richContent?.type === "wine_recommendations";
-        if (parsed.content && !hasWineRecommendations) {
-          assistantMessages.push({
-            role: ROLE_ASSISTANT,
-            content: parsed.content,
-          });
+        if (!hasWineRecommendations && !hadRecommendations) {
+          if (parsed.content) {
+            assistantMessages.push({
+              role: ROLE_ASSISTANT,
+              content: parsed.content,
+            });
+          }
+          if (parsed.followUpQuestionContent) {
+            assistantMessages.push({
+              role: ROLE_ASSISTANT,
+              content: parsed.followUpQuestionContent,
+            });
+          }
         }
         if (parsed.summaryContent) {
           assistantMessages.push({
             role: ROLE_ASSISTANT,
             content: parsed.summaryContent,
             variant: "summary",
-          });
-        }
-        if (parsed.followUpQuestionContent) {
-          assistantMessages.push({
-            role: ROLE_ASSISTANT,
-            content: parsed.followUpQuestionContent,
           });
         }
         if (assistantMessages.length > 0) {
@@ -215,6 +235,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
         clearCompletedTimeout();
         setPhase("error");
         setRecommendations(null);
+        setFollowUpQuestion(null);
         setQuickReplies([]);
         setError(
           caughtError instanceof Error ? caughtError.message : "De kioskservice is tijdelijk onbereikbaar.",
@@ -239,6 +260,7 @@ export function useKioskSession(options: UseKioskSessionOptions = {}) {
     phase,
     messages,
     recommendations,
+    followUpQuestion,
     quickReplies,
     loading,
     error,

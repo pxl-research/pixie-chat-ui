@@ -11,6 +11,7 @@ type ChatScreenProps = {
   welcomeMessage?: string;
   messages: KioskMessage[];
   recommendations?: KioskRecommendations | null;
+  followUpQuestion?: string | null;
   quickReplies: QuickReplyOption[];
   loading: boolean;
   onRestart: () => void;
@@ -24,6 +25,7 @@ export function ChatScreen({
   welcomeMessage,
   messages,
   recommendations,
+  followUpQuestion,
   quickReplies,
   loading,
   onRestart,
@@ -46,7 +48,7 @@ export function ChatScreen({
     }
 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading, recommendations]);
+  }, [messages, loading, recommendations, followUpQuestion]);
 
   useEffect(() => {
     if (!loading) {
@@ -211,6 +213,12 @@ export function ChatScreen({
                 ))}
               </div>
             </section>
+          ) : null}
+          {followUpQuestion ? (
+            <article className="chat-screen__message chat-screen__message--assistant">
+              <span className="chat-screen__role">{title}</span>
+              <p>{followUpQuestion}</p>
+            </article>
           ) : null}
           <div ref={messagesEndRef} />
         </div>
