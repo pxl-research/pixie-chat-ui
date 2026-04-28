@@ -62,6 +62,7 @@ export default function App() {
           welcomeMessage={copy.welcomeMessage}
           messages={session.messages}
           recommendations={session.recommendations}
+          followUpQuestion={session.followUpQuestion}
           quickReplies={session.quickReplies}
           loading={session.loading}
           onRestart={session.resetConversation}
