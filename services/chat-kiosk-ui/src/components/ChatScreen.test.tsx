@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,7 +23,7 @@ describe("ChatScreen", () => {
     expect(container.querySelectorAll(".chat-screen__typing-dot")).toHaveLength(3);
   });
 
-  it("scrolls to the bottom when the assistant typing bubble appears", () => {
+  it("scrolls to the bottom when the assistant typing bubble appears", async () => {
     const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
     const scrollIntoView = vi.fn();
     window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
@@ -54,13 +54,15 @@ describe("ChatScreen", () => {
         />,
       );
 
-      expect(scrollIntoView).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
     } finally {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
     }
   });
 
-  it("scrolls the message container when the assistant response appears", () => {
+  it("scrolls the message container when the assistant response appears", async () => {
     const originalScrollTo = window.HTMLElement.prototype.scrollTo;
     const scrollTo = vi.fn();
     window.HTMLElement.prototype.scrollTo = scrollTo;
@@ -94,7 +96,9 @@ describe("ChatScreen", () => {
         />,
       );
 
-      expect(scrollTo).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(scrollTo).toHaveBeenCalled();
+      });
     } finally {
       window.HTMLElement.prototype.scrollTo = originalScrollTo;
     }
@@ -187,6 +191,7 @@ describe("ChatScreen", () => {
 
     const questionBubble = screen.getByText("Hoe tevreden ben je met deze suggesties?");
     expect(questionBubble).toBeInTheDocument();
+    expect(questionBubble.closest("article")).toHaveClass("chat-screen__message--follow-up");
 
     // The follow-up question bubble must appear after the recommendations section in the DOM
     const recommendationRail = container.querySelector(".chat-screen__recommendation-rail");

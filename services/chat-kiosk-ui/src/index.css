@@ -396,6 +396,20 @@ input:focus-visible {
   color: rgba(255, 255, 255, 0.6);
 }
 
+.chat-screen__message--follow-up {
+  background:
+    radial-gradient(circle at top right, rgba(223, 168, 91, 0.26), transparent 55%),
+    rgba(247, 239, 227, 0.2);
+  border-color: rgba(223, 168, 91, 0.42);
+  box-shadow:
+    0 0.35rem 1.35rem rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(223, 168, 91, 0.18) inset;
+}
+
+.chat-screen__message--follow-up .chat-screen__role {
+  color: rgba(242, 212, 157, 0.88);
+}
+
 .chat-screen__typing-indicator {
   display: inline-flex;
   align-items: center;

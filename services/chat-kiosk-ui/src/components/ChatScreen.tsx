@@ -35,19 +35,31 @@ export function ChatScreen({
   const [activeRecommendationIndex, setActiveRecommendationIndex] = useState(0);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const followUpQuestionRef = useRef<HTMLElement>(null);
+  const recommendationRailRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recommendationCardRefs = useRef<Array<HTMLElement | null>>([]);
 
   useEffect(() => {
-    const messagesContainer = messagesContainerRef.current;
-    if (messagesContainer && typeof messagesContainer.scrollTo === "function") {
-      messagesContainer.scrollTo({
-        top: messagesContainer.scrollHeight,
-        behavior: "smooth",
-      });
-    }
+    const scrollFrame = window.requestAnimationFrame(() => {
+      const messagesContainer = messagesContainerRef.current;
+      if (messagesContainer && typeof messagesContainer.scrollTo === "function") {
+        messagesContainer.scrollTo({
+          top: messagesContainer.scrollHeight,
+          behavior: "smooth",
+        });
+      }
 
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (followUpQuestionRef.current) {
+        followUpQuestionRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(scrollFrame);
+    };
   }, [messages, loading, recommendations, followUpQuestion]);
 
   useEffect(() => {
@@ -65,10 +77,15 @@ export function ChatScreen({
       return;
     }
 
-    recommendationCardRefs.current[activeRecommendationIndex]?.scrollIntoView({
+    const rail = recommendationRailRef.current;
+    const activeCard = recommendationCardRefs.current[activeRecommendationIndex];
+    if (!rail || !activeCard || typeof rail.scrollTo !== "function") {
+      return;
+    }
+
+    rail.scrollTo({
+      left: activeCard.offsetLeft,
       behavior: "smooth",
-      block: "nearest",
-      inline: "nearest",
     });
   }, [activeRecommendationIndex, recommendations]);
 
@@ -182,7 +199,7 @@ export function ChatScreen({
                   {activeRecommendationIndex + 1} / {recommendations.items.length}
                 </span>
               </div>
-              <div className="chat-screen__recommendation-rail">
+              <div ref={recommendationRailRef} className="chat-screen__recommendation-rail">
                 {recommendations.items.map((item, index) => (
                   <article
                     key={`${item.name}-${item.country}-${item.region}`}
@@ -215,7 +232,10 @@ export function ChatScreen({
             </section>
           ) : null}
           {followUpQuestion ? (
-            <article className="chat-screen__message chat-screen__message--assistant">
+            <article
+              ref={followUpQuestionRef}
+              className="chat-screen__message chat-screen__message--assistant chat-screen__message--follow-up"
+            >
               <span className="chat-screen__role">{title}</span>
               <p>{followUpQuestion}</p>
             </article>
